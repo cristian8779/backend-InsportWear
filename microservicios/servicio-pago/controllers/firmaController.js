@@ -25,3 +25,5 @@ const generarFirma = async (req, res) => {
     res.status(500).json({ mensaje: "Error al generar la firma.", error: error.message });
   }
 };
+
+module.exports = { generarFirma };
