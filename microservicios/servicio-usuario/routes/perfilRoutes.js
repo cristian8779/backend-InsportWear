@@ -3,7 +3,8 @@ const {
   obtenerPerfil,
   actualizarImagenPerfil,
   eliminarImagenPerfil,
-  crearPerfil, // <-- importante: nueva función para registrar perfil desde auth
+  crearPerfil,
+  actualizarPerfil,
 } = require("../controller/perfilController");
 
 const { verificarToken } = require("../middlewares/authMiddleware");
@@ -11,17 +12,31 @@ const uploadUsuario = require("../middlewares/uploadUsuario");
 
 const router = express.Router();
 
-// Ruta para crear perfil desde microservicio de autenticación
-// No requiere token porque es llamada interna
+/**
+ * 🚀 Crear perfil desde el microservicio de autenticación
+ * Esta ruta es interna, no requiere token
+ */
 router.post("/", crearPerfil);
 
-// Obtener perfil del usuario autenticado
+/**
+ * 👤 Obtener el perfil del usuario autenticado
+ */
 router.get("/", verificarToken, obtenerPerfil);
 
-// Actualizar imagen de perfil
-router.put("/imagen", verificarToken, uploadUsuario.single("imagen"), actualizarImagenPerfil);
+/**
+ * 🖼️ Subir o actualizar la imagen de perfil
+ * Usamos POST para evitar errores con multipart/form-data
+ */
+router.post("/imagen", verificarToken, uploadUsuario.single("imagen"), actualizarImagenPerfil);
 
-// Eliminar imagen de perfil
+/**
+ * 🗑️ Eliminar la imagen de perfil del usuario
+ */
 router.delete("/imagen", verificarToken, eliminarImagenPerfil);
+
+/**
+ * 📝 Actualizar datos del perfil: nombre, dirección o teléfono
+ */
+router.put("/datos", verificarToken, actualizarPerfil);
 
 module.exports = router;

@@ -2,9 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
-const fileUpload = require("express-fileupload");
 const path = require("path");
-
 
 // Cargar variables de entorno
 dotenv.config();
@@ -20,16 +18,19 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload({ useTempFiles: true }));
+
+// ❌ ELIMINADO: express-fileupload
+// app.use(fileUpload({ useTempFiles: true }));
+
+// Archivos estáticos (en caso de usarlos localmente)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Rutas principales
 app.use("/api/perfil", require("./routes/perfilRoutes"));
 app.use("/api/usuario", require("./routes/usuarioRoutes"));
-app.use("/api/password", require("./routes/resetPasswordRoutes")); // 🚨 NUEVO: ruta de restablecimiento
+app.use("/api/password", require("./routes/resetPasswordRoutes")); // Restablecer contraseña
 
-
-// Servir archivos estáticos (por si usas HTML para restablecer)
+// Servir archivos estáticos (útil para HTMLs de pruebas)
 app.use(express.static(path.join(__dirname, "public")));
 
 // Puerto de escucha
