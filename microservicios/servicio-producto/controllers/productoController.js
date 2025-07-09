@@ -1,4 +1,4 @@
-const Producto = require('../models/producto');
+const Producto = require('../models/Producto');
 const cloudinary = require('../config/cloudinary');
 const Historial = require('../models/Historial');
 const axios = require('axios');
