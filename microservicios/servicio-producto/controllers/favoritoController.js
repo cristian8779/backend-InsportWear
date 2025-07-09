@@ -1,5 +1,5 @@
 const Favorito = require('../models/Favorito');
-const Producto = require('../models/producto');
+const Producto = require('../models/Producto');
 
 // Añadir producto a favoritos (sin variaciones)
 const agregarFavorito = async (req, res) => {

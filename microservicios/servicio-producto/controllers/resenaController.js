@@ -1,5 +1,5 @@
 const Resena = require('../models/Resena');
-const Producto = require('../models/producto');
+const Producto = require('../models/Producto');
 const axios = require('axios');
 
 // Crear reseña
