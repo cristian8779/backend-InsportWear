@@ -17,6 +17,10 @@ const CredencialesSchema = new mongoose.Schema({
     type: String,
     enum: ["usuario", "admin", "superAdmin"],
     default: 'usuario'
+  },
+  refreshToken: {
+    type: String,
+    default: null
   }
 }, { timestamps: true });
 

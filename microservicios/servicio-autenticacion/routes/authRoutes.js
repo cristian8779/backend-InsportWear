@@ -2,6 +2,7 @@ const express = require('express');
 const {
   registrar,
   login,
+  renovarToken, // ✅ nuevo
   verificarToken,
   obtenerCredencialPorId,
   cambiarRolUsuarioPorCorreo
@@ -23,6 +24,9 @@ router.post('/registrar', registrar);
 
 // Login de usuario
 router.post('/login', login);
+
+// 🔄 Renovar token (refreshToken)
+router.post('/refresh', renovarToken); // ✅ nueva ruta
 
 // Verificación de token (útil para frontend)
 router.get('/verificar', verificarToken, (req, res) => {

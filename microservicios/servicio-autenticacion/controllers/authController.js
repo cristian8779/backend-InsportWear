@@ -5,7 +5,7 @@ const Credenciales = require("../models/Credenciales");
 const resend = require("../config/resend");
 require("dotenv").config();
 const generarPlantillaBienvenida = require("../utils/plantillaBienvenida");
-const { actualizarRolDeUsuario } = require("../services/gestionRolesService"); // 👉 Importamos el servicio
+const { actualizarRolDeUsuario } = require("../services/gestionRolesService");
 
 // ✅ Registrar nuevo usuario
 const registrar = async (req, res) => {
@@ -14,7 +14,7 @@ const registrar = async (req, res) => {
 
     if (!email || !password || !nombre) {
       return res.status(400).json({
-        mensaje: "Para registrarte necesitas proporcionar tu nombre, correo electrónico y una contraseña válida.",
+        mensaje: "Por favor completa todos los campos: nombre, correo electrónico y contraseña.",
       });
     }
 
@@ -22,11 +22,11 @@ const registrar = async (req, res) => {
     const existe = await Credenciales.findOne({ email: emailLimpio });
     if (existe) {
       return res.status(400).json({
-        mensaje: "Ya existe una cuenta registrada con este correo. Intenta iniciar sesión o usar otro correo.",
+        mensaje: "Ya existe una cuenta registrada con este correo. Intenta iniciar sesión o utiliza otro correo.",
       });
     }
 
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[A-Z])(?=.*[a-z]).{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
         mensaje: "La contraseña debe tener al menos 8 caracteres, una letra mayúscula, una letra minúscula y un número.",
@@ -37,13 +37,12 @@ const registrar = async (req, res) => {
       const yaHay = await Credenciales.findOne({ rol: "superAdmin" });
       if (yaHay) {
         return res.status(403).json({
-          mensaje: "Ya existe un superadministrador registrado en el sistema. Solo puede haber uno.",
+          mensaje: "Ya existe un superadministrador en el sistema. Solo puede haber uno.",
         });
       }
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
     const nuevaCredencial = new Credenciales({
       email: emailLimpio,
       password: passwordHash,
@@ -52,18 +51,14 @@ const registrar = async (req, res) => {
 
     await nuevaCredencial.save();
 
-    // Validar URL de microservicio
     if (!process.env.USUARIO_SERVICE_URL) {
       console.error("❌ USUARIO_SERVICE_URL no está definida");
-      return res.status(500).json({ mensaje: "Error interno de configuración." });
+      return res.status(500).json({ mensaje: "Error interno de configuración del servidor." });
     }
 
-    // Crear perfil de usuario en el microservicio
     let usuarioCreado;
     try {
       const url = `${process.env.USUARIO_SERVICE_URL}/api/perfil`;
-      console.log("📡 POST ->", url);
-
       const respuesta = await axios.post(url, {
         nombre: nombre.trim(),
         credenciales: nuevaCredencial._id,
@@ -71,14 +66,12 @@ const registrar = async (req, res) => {
 
       usuarioCreado = respuesta.data;
     } catch (error) {
-      console.error("❌ Error al crear perfil de usuario:", error.message);
-      await Credenciales.findByIdAndDelete(nuevaCredencial._id); // rollback
+      await Credenciales.findByIdAndDelete(nuevaCredencial._id);
       return res.status(500).json({
-        mensaje: "Ocurrió un problema al completar el registro. Intenta nuevamente en unos minutos.",
+        mensaje: "Ocurrió un problema al crear tu perfil. Intenta registrarte nuevamente.",
       });
     }
 
-    // Enviar correo de bienvenida
     try {
       await resend.emails.send({
         from: "Soporte <soporte@soportee.store>",
@@ -87,18 +80,28 @@ const registrar = async (req, res) => {
         html: generarPlantillaBienvenida(nombre),
       });
     } catch (error) {
-      console.error("⚠️ Error al enviar correo de bienvenida:", error.message);
+      console.warn("⚠️ Error al enviar correo de bienvenida:", error.message);
     }
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: usuarioCreado._id, rol: nuevaCredencial.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "15m" }
     );
+
+    const refreshToken = jwt.sign(
+      { id: usuarioCreado._id, rol: nuevaCredencial.rol },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    nuevaCredencial.refreshToken = refreshToken;
+    await nuevaCredencial.save();
 
     res.status(201).json({
       mensaje: "Tu cuenta fue creada exitosamente.",
-      token,
+      accessToken,
+      refreshToken,
       usuario: {
         nombre: usuarioCreado.nombre,
         email: nuevaCredencial.email,
@@ -120,7 +123,7 @@ const login = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({
-        mensaje: "Por favor, ingresa tanto tu correo electrónico como tu contraseña para iniciar sesión.",
+        mensaje: "Por favor, ingresa tu correo electrónico y contraseña.",
       });
     }
 
@@ -134,7 +137,6 @@ const login = async (req, res) => {
       return res.status(400).json({ mensaje: "Correo o contraseña incorrectos." });
     }
 
-    // Validar URL
     if (!process.env.USUARIO_SERVICE_URL) {
       return res.status(500).json({ mensaje: "Error de configuración del servidor." });
     }
@@ -142,26 +144,33 @@ const login = async (req, res) => {
     let usuario;
     try {
       const url = `${process.env.USUARIO_SERVICE_URL}/api/usuario/credencial/${credencial._id}`;
-      console.log("📡 GET ->", url);
-
       const respuesta = await axios.get(url);
       usuario = respuesta.data;
     } catch (error) {
-      console.error("❌ Error al obtener perfil del usuario:", error.message);
       return res.status(500).json({
-        mensaje: "No se pudo acceder al perfil del usuario. Intenta nuevamente más tarde.",
+        mensaje: "No se pudo acceder a tu perfil. Intenta nuevamente más tarde.",
       });
     }
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: usuario._id, rol: credencial.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "15m" }
     );
+
+    const refreshToken = jwt.sign(
+      { id: usuario._id, rol: credencial.rol },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    credencial.refreshToken = refreshToken;
+    await credencial.save();
 
     res.json({
       mensaje: "Has iniciado sesión correctamente.",
-      token,
+      accessToken,
+      refreshToken,
       usuario: {
         nombre: usuario.nombre,
         email: credencial.email,
@@ -171,8 +180,42 @@ const login = async (req, res) => {
   } catch (err) {
     console.error("❌ Error general en login:", err.message);
     res.status(500).json({
-      mensaje: "Ocurrió un error al intentar iniciar sesión. Por favor, vuelve a intentarlo más tarde.",
+      mensaje: "Ocurrió un error al iniciar sesión. Por favor, intenta nuevamente.",
     });
+  }
+};
+
+// ✅ Renovar token
+const renovarToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ mensaje: "No se proporcionó el token de renovación." });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const credencial = await Credenciales.findById(decoded.id);
+
+    if (!credencial || credencial.refreshToken !== refreshToken) {
+      return res.status(403).json({
+        mensaje: "Token inválido. Por favor, vuelve a iniciar sesión.",
+      });
+    }
+
+    const nuevoAccessToken = jwt.sign(
+      { id: decoded.id, rol: decoded.rol },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.json({
+      mensaje: "Tu sesión ha sido renovada correctamente.",
+      accessToken: nuevoAccessToken,
+    });
+  } catch (err) {
+    console.error("❌ Error al renovar token:", err.message);
+    res.status(403).json({ mensaje: "Token expirado o inválido. Inicia sesión nuevamente." });
   }
 };
 
@@ -180,7 +223,7 @@ const login = async (req, res) => {
 const verificarToken = (req, res, next) => {
   const token = req.header("Authorization")?.split(" ")[1];
   if (!token) {
-    return res.status(401).json({ mensaje: "No se ha proporcionado un token de acceso." });
+    return res.status(401).json({ mensaje: "No tienes autorización para acceder a este recurso." });
   }
 
   try {
@@ -189,12 +232,12 @@ const verificarToken = (req, res, next) => {
     next();
   } catch (err) {
     return res.status(403).json({
-      mensaje: "El token es inválido o ha expirado. Por favor, inicia sesión nuevamente.",
+      mensaje: "Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.",
     });
   }
 };
 
-// ✅ Obtener credencial por ID (usada por microservicio)
+// ✅ Obtener credencial por ID
 const obtenerCredencialPorId = async (req, res) => {
   try {
     const { id } = req.params;
@@ -206,18 +249,17 @@ const obtenerCredencialPorId = async (req, res) => {
 
     res.json(credencial);
   } catch (error) {
-    console.error("❌ Error al obtener credencial:", error.message);
-    res.status(500).json({ mensaje: "Error interno al consultar la credencial." });
+    res.status(500).json({ mensaje: "No se pudo consultar la información solicitada." });
   }
 };
 
-// ✅ Cambiar rol de un usuario por email (usado por microservicio de rol)
+// ✅ Cambiar rol de un usuario por correo
 const cambiarRolUsuarioPorCorreo = async (req, res) => {
   const { email, nuevoRol } = req.body;
   const rolSolicitante = req.usuario?.rol;
 
   if (!email || !nuevoRol) {
-    return res.status(400).json({ mensaje: "Faltan campos requeridos: email y nuevoRol." });
+    return res.status(400).json({ mensaje: "Debes proporcionar el correo del usuario y el nuevo rol." });
   }
 
   const resultado = await actualizarRolDeUsuario({ email, nuevoRol, rolSolicitante });
@@ -232,7 +274,8 @@ const cambiarRolUsuarioPorCorreo = async (req, res) => {
 module.exports = {
   registrar,
   login,
+  renovarToken,
   verificarToken,
   obtenerCredencialPorId,
-  cambiarRolUsuarioPorCorreo, // 👈 ¡Nuevo export listo para usarse!
+  cambiarRolUsuarioPorCorreo,
 };
