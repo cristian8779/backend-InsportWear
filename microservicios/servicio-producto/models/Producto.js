@@ -55,6 +55,10 @@ const ProductoSchema = new mongoose.Schema({
     ref: 'Categoria',
     required: [true, 'La categoría es obligatoria']
   },
+  subcategoria: {
+    type: String,
+    trim: true
+  },
   variaciones: {
     type: [VariacionSchema],
     default: []

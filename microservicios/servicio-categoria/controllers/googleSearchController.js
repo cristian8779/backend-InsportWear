@@ -1,6 +1,7 @@
 const Categoria = require('../models/Categoria');
 const { buscarImagenesGoogle } = require('../utils/googleSearch');
 const cloudinary = require('../config/cloudinary');
+const SearchQuota = require('../models/SearchQuota'); // Modelo para controlar el uso diario
 
 /**
  * Controlador para buscar imágenes desde Google Custom Search
@@ -11,29 +12,82 @@ const buscarImagenesGoogleController = async (req, res) => {
 
   if (!query) {
     return res.status(400).json({
-      mensaje: "🔍 Debes ingresar un término para buscar imágenes. Ejemplo: 'zapatillas', 'raqueta', 'camisa'."
+      mensaje: "🔍 Para ayudarte mejor, por favor ingresa un término de búsqueda. Ejemplo: 'zapatillas', 'raqueta', 'camisa'."
     });
   }
 
   try {
+    // Verificar cuota diaria
+    const hoy = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    let cuota = await SearchQuota.findOne({ fecha: hoy });
+
+    if (!cuota) {
+      cuota = await SearchQuota.create({ fecha: hoy, usadas: 1 });
+    } else {
+      if (cuota.usadas >= 100) {
+        return res.status(429).json({
+          mensaje: "🚫 Has alcanzado el límite diario de 100 búsquedas permitidas por el sistema.",
+          detalle: "Esta restricción existe para optimizar recursos. Podrás volver a buscar imágenes mañana.",
+          busquedas_restantes: 0,
+          limite_diario: 100
+        });
+      }
+      cuota.usadas += 1;
+      await cuota.save();
+    }
+
     const imagenes = await buscarImagenesGoogle(query, 10);
 
     if (!imagenes.length) {
       return res.status(404).json({
-        mensaje: `😕 No se encontraron imágenes para "${query}". Intenta con una palabra más específica.`,
-        sugerencia: "Evita términos demasiado generales como 'ropa', 'color', 'producto'."
+        mensaje: `😕 No se encontraron resultados para "${query}".`,
+        sugerencia: "Te recomendamos usar términos más específicos. Evita palabras muy generales como 'ropa', 'producto' o 'color'.",
+        busquedas_restantes: Math.max(100 - cuota.usadas, 0),
+        limite_diario: 100
       });
     }
 
     res.status(200).json({
-      mensaje: `✅ Se encontraron imágenes para: "${query}". Haz clic en una para asociarla a tu categoría.`,
-      resultados: imagenes
+      mensaje: `✅ Se encontraron imágenes relacionadas con: "${query}". Selecciona la que mejor represente tu categoría.`,
+      resultados: imagenes,
+      busquedas_restantes: Math.max(100 - cuota.usadas, 0),
+      limite_diario: 100
     });
 
   } catch (error) {
     console.error('❌ Error al buscar imágenes:', error.message);
     res.status(500).json({
-      mensaje: '🚨 Ocurrió un error al contactar el buscador de imágenes. Intenta nuevamente más tarde.',
+      mensaje: '💥 Lo sentimos, ocurrió un problema al intentar contactar el buscador de imágenes.',
+      sugerencia: 'Por favor, intenta nuevamente más tarde.',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Consultar el estado actual de la cuota de búsqueda diaria
+ * Útil para mostrar visualmente cuántas búsquedas quedan
+ */
+const obtenerCuotaBusqueda = async (req, res) => {
+  try {
+    const hoy = new Date().toISOString().split('T')[0];
+    const cuota = await SearchQuota.findOne({ fecha: hoy });
+
+    const usadas = cuota ? cuota.usadas : 0;
+    const restantes = Math.max(100 - usadas, 0);
+
+    res.status(200).json({
+      mensaje: '📊 Este es el estado actual de tus búsquedas diarias.',
+      usadas,
+      restantes,
+      limite_diario: 100,
+      porcentaje_usado: Math.round((usadas / 100) * 100)
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener la cuota de búsqueda:', error.message);
+    res.status(500).json({
+      mensaje: '💥 Error al consultar la cuota diaria.',
+      sugerencia: 'Intenta nuevamente más tarde.',
       error: error.message
     });
   }
@@ -47,35 +101,42 @@ const asociarImagenInternetACategoria = async (req, res) => {
   const { urlImagen } = req.body;
 
   if (!urlImagen) {
-    return res.status(400).json({ mensaje: '🔗 Debes proporcionar una URL de imagen válida.' });
+    return res.status(400).json({
+      mensaje: '🔗 Para asociar una imagen, primero debes proporcionar una URL válida.'
+    });
   }
 
   try {
     const categoria = await Categoria.findById(id);
     if (!categoria) {
-      return res.status(404).json({ mensaje: '🚫 Categoría no encontrada.' });
+      return res.status(404).json({
+        mensaje: '🚫 No se encontró la categoría seleccionada.',
+        sugerencia: 'Verifica que el ID sea correcto o selecciona otra categoría.'
+      });
     }
 
-    // Si ya tiene una imagen en Cloudinary, eliminarla
+    // Eliminar imagen anterior si es de Cloudinary
     if (categoria.imagen?.includes('res.cloudinary.com')) {
       const nombreConExtension = categoria.imagen.split('/').pop();
       const publicId = `categorias/${nombreConExtension.split('.')[0]}`;
       await cloudinary.uploader.destroy(publicId);
     }
 
-    // Asociar la nueva imagen desde internet
+    // Asociar la nueva imagen
     categoria.imagen = urlImagen;
     await categoria.save();
 
     res.status(200).json({
-      mensaje: '📸 Imagen actualizada correctamente. Ahora esta imagen está asociada a la categoría.',
+      mensaje: '📸 Imagen asociada correctamente a la categoría.',
+      detalle: 'Esta nueva imagen será visible en el catálogo o módulo correspondiente.',
       categoria
     });
 
   } catch (error) {
     console.error('❌ Error al actualizar la imagen de la categoría:', error.message);
     res.status(500).json({
-      mensaje: '💥 Hubo un error al actualizar la imagen. Intenta nuevamente.',
+      mensaje: '💥 Ocurrió un error inesperado al intentar guardar la imagen.',
+      sugerencia: 'Intenta nuevamente más tarde o contacta a soporte si el problema persiste.',
       error: error.message
     });
   }
@@ -83,5 +144,6 @@ const asociarImagenInternetACategoria = async (req, res) => {
 
 module.exports = {
   buscarImagenesGoogle: buscarImagenesGoogleController,
-  asociarImagenInternetACategoria
+  asociarImagenInternetACategoria,
+  obtenerCuotaBusqueda // ← nuevo export
 };
