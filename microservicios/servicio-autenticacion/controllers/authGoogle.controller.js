@@ -40,12 +40,15 @@ const loginGoogle = async (req, res) => {
     if (credencial) {
       if (credencial.metodo !== "google") {
         return res.status(400).json({
-          mensaje: "Ya existe una cuenta registrada con este correo usando contraseña. Inicia sesión de forma tradicional.",
+          mensaje:
+            "Ya existe una cuenta registrada con este correo usando una contraseña. Por favor, inicia sesión de forma tradicional.",
         });
       }
 
       // Buscar usuario desde microservicio por ID de credenciales
-      const respuesta = await axios.get(`${process.env.USUARIO_SERVICE_URL}/api/usuario/por-credencial/${credencial._id}`);
+      const respuesta = await axios.get(
+        `${process.env.USUARIO_SERVICE_URL}/api/usuario/por-credencial/${credencial._id}`
+      );
       usuario = respuesta.data;
     } else {
       // Crear credencial nueva
@@ -57,10 +60,10 @@ const loginGoogle = async (req, res) => {
       });
       await credencial.save();
 
-      // Crear perfil del usuario
+      // Crear perfil del usuario con imagen de Google
       const respuesta = await axios.post(`${process.env.USUARIO_SERVICE_URL}/api/usuario`, {
         nombre,
-        imagenPerfil: picture,
+        imagenPerfil: picture, // Enviar la imagen de Google
         credenciales: credencial._id,
       });
 
@@ -75,7 +78,7 @@ const loginGoogle = async (req, res) => {
       });
     }
 
-    // Firmar token
+    // Firmar token JWT
     const token = jwt.sign(
       { id: credencial._id, rol: credencial.rol },
       process.env.JWT_SECRET,
@@ -89,13 +92,14 @@ const loginGoogle = async (req, res) => {
         nombre: usuario.nombre,
         email: credencial.email,
         rol: credencial.rol,
-        foto: usuario.imagenPerfil,
+        foto: usuario.imagenPerfil, // Imagen almacenada correctamente
       },
     });
   } catch (error) {
-    console.error("Error verificando token de Google:", error);
+    console.error("❌ Error verificando token de Google:", error);
     return res.status(401).json({
-      mensaje: "El token de Google no es válido o ha expirado. Intenta iniciar sesión nuevamente.",
+      mensaje:
+        "El token de Google no es válido o ha expirado. Por favor, volvé a intentarlo.",
       error: error.message,
     });
   }

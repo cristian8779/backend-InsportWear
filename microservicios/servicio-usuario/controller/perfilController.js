@@ -5,7 +5,7 @@ const axios = require("axios");
 // Crear perfil desde microservicio de autenticación
 const crearPerfil = async (req, res) => {
   try {
-    const { nombre, credenciales } = req.body;
+    const { nombre, credenciales, imagenPerfil } = req.body;
 
     if (!nombre || !credenciales) {
       return res.status(400).json({
@@ -16,6 +16,7 @@ const crearPerfil = async (req, res) => {
     const nuevoUsuario = new Usuario({
       nombre: nombre.trim(),
       credenciales,
+      imagenPerfil: imagenPerfil || "", // Se guarda la imagen si viene (por ejemplo, desde Google)
     });
 
     await nuevoUsuario.save();
