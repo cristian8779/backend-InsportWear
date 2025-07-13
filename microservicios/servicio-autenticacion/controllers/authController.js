@@ -14,7 +14,7 @@ const registrar = async (req, res) => {
 
     if (!email || !password || !nombre) {
       return res.status(400).json({
-        mensaje: "Por favor completa todos los campos: nombre, correo electrónico y contraseña.",
+        mensaje: "Por favor, asegúrate de completar todos los campos: nombre, correo electrónico y contraseña.",
       });
     }
 
@@ -22,7 +22,7 @@ const registrar = async (req, res) => {
     const existe = await Credenciales.findOne({ email: emailLimpio });
     if (existe) {
       return res.status(400).json({
-        mensaje: "Ya existe una cuenta registrada con este correo. Intenta iniciar sesión o utiliza otro correo.",
+        mensaje: "Este correo ya está registrado. Si ya tienes cuenta, por favor inicia sesión o usa otro correo.",
       });
     }
 
@@ -53,7 +53,7 @@ const registrar = async (req, res) => {
 
     if (!process.env.USUARIO_SERVICE_URL) {
       console.error("❌ USUARIO_SERVICE_URL no está definida");
-      return res.status(500).json({ mensaje: "Error interno de configuración del servidor." });
+      return res.status(500).json({ mensaje: "Error interno del servidor. Estamos trabajando para solucionarlo." });
     }
 
     let usuarioCreado;
@@ -68,7 +68,7 @@ const registrar = async (req, res) => {
     } catch (error) {
       await Credenciales.findByIdAndDelete(nuevaCredencial._id);
       return res.status(500).json({
-        mensaje: "Ocurrió un problema al crear tu perfil. Intenta registrarte nuevamente.",
+        mensaje: "Tuvimos un inconveniente al crear tu perfil. Por favor intenta registrarte nuevamente.",
       });
     }
 
@@ -99,7 +99,7 @@ const registrar = async (req, res) => {
     await nuevaCredencial.save();
 
     res.status(201).json({
-      mensaje: "Tu cuenta fue creada exitosamente.",
+      mensaje: "¡Tu cuenta ha sido creada con éxito! 🎉",
       accessToken,
       refreshToken,
       usuario: {
@@ -111,7 +111,7 @@ const registrar = async (req, res) => {
   } catch (err) {
     console.error("❌ Error general en registro:", err.message);
     res.status(500).json({
-      mensaje: "Ocurrió un error al registrar tu cuenta. Intenta nuevamente más tarde.",
+      mensaje: "Ups... Ocurrió un error al crear tu cuenta. Por favor, intenta nuevamente más tarde.",
     });
   }
 };
@@ -123,22 +123,22 @@ const login = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({
-        mensaje: "Por favor, ingresa tu correo electrónico y contraseña.",
+        mensaje: "Por favor, ingresa tu correo y contraseña.",
       });
     }
 
     const credencial = await Credenciales.findOne({ email: email.trim().toLowerCase() });
     if (!credencial) {
-      return res.status(400).json({ mensaje: "Correo o contraseña incorrectos." });
+      return res.status(400).json({ mensaje: "Correo o contraseña incorrectos. Verifica e intenta nuevamente." });
     }
 
     const esValida = await bcrypt.compare(password, credencial.password);
     if (!esValida) {
-      return res.status(400).json({ mensaje: "Correo o contraseña incorrectos." });
+      return res.status(400).json({ mensaje: "Correo o contraseña incorrectos. Intenta nuevamente." });
     }
 
     if (!process.env.USUARIO_SERVICE_URL) {
-      return res.status(500).json({ mensaje: "Error de configuración del servidor." });
+      return res.status(500).json({ mensaje: "Error interno del servidor. Vuelve a intentarlo más tarde." });
     }
 
     let usuario;
@@ -148,7 +148,7 @@ const login = async (req, res) => {
       usuario = respuesta.data;
     } catch (error) {
       return res.status(500).json({
-        mensaje: "No se pudo acceder a tu perfil. Intenta nuevamente más tarde.",
+        mensaje: "No pudimos acceder a tu perfil en este momento. Intenta más tarde.",
       });
     }
 
@@ -168,7 +168,7 @@ const login = async (req, res) => {
     await credencial.save();
 
     res.json({
-      mensaje: "Has iniciado sesión correctamente.",
+      mensaje: "¡Inicio de sesión exitoso! 👋",
       accessToken,
       refreshToken,
       usuario: {
@@ -191,7 +191,7 @@ const renovarToken = async (req, res) => {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return res.status(400).json({ mensaje: "No se proporcionó el token de renovación." });
+      return res.status(400).json({ mensaje: "Token de sesión no proporcionado." });
     }
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
@@ -199,7 +199,7 @@ const renovarToken = async (req, res) => {
 
     if (!credencial || credencial.refreshToken !== refreshToken) {
       return res.status(403).json({
-        mensaje: "Token inválido. Por favor, vuelve a iniciar sesión.",
+        mensaje: "Tu sesión no es válida. Por favor, vuelve a iniciar sesión.",
       });
     }
 
@@ -210,12 +210,12 @@ const renovarToken = async (req, res) => {
     );
 
     res.json({
-      mensaje: "Tu sesión ha sido renovada correctamente.",
+      mensaje: "Sesión renovada exitosamente.",
       accessToken: nuevoAccessToken,
     });
   } catch (err) {
     console.error("❌ Error al renovar token:", err.message);
-    res.status(403).json({ mensaje: "Token expirado o inválido. Inicia sesión nuevamente." });
+    res.status(403).json({ mensaje: "Tu sesión ha expirado. Inicia sesión nuevamente para continuar." });
   }
 };
 
@@ -223,7 +223,7 @@ const renovarToken = async (req, res) => {
 const verificarToken = (req, res, next) => {
   const token = req.header("Authorization")?.split(" ")[1];
   if (!token) {
-    return res.status(401).json({ mensaje: "No tienes autorización para acceder a este recurso." });
+    return res.status(401).json({ mensaje: "Acceso no autorizado. Inicia sesión para continuar." });
   }
 
   try {
@@ -244,12 +244,12 @@ const obtenerCredencialPorId = async (req, res) => {
     const credencial = await Credenciales.findById(id).select("email rol");
 
     if (!credencial) {
-      return res.status(404).json({ mensaje: "No se encontró ninguna credencial con ese ID." });
+      return res.status(404).json({ mensaje: "No encontramos una cuenta con ese ID." });
     }
 
     res.json(credencial);
   } catch (error) {
-    res.status(500).json({ mensaje: "No se pudo consultar la información solicitada." });
+    res.status(500).json({ mensaje: "No se pudo obtener la información. Intenta más tarde." });
   }
 };
 
@@ -259,7 +259,7 @@ const cambiarRolUsuarioPorCorreo = async (req, res) => {
   const rolSolicitante = req.usuario?.rol;
 
   if (!email || !nuevoRol) {
-    return res.status(400).json({ mensaje: "Debes proporcionar el correo del usuario y el nuevo rol." });
+    return res.status(400).json({ mensaje: "Por favor, proporciona el correo y el nuevo rol del usuario." });
   }
 
   const resultado = await actualizarRolDeUsuario({ email, nuevoRol, rolSolicitante });
@@ -271,6 +271,32 @@ const cambiarRolUsuarioPorCorreo = async (req, res) => {
   });
 };
 
+// ✅ Verificar si un email ya está registrado
+const emailExiste = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ mensaje: "Por favor, proporciona un correo válido." });
+    }
+
+    const emailLimpio = email.trim().toLowerCase();
+    const credencial = await Credenciales.findOne({ email: emailLimpio });
+
+    return res.status(200).json(
+      credencial
+        ? {
+            existe: true,
+            mensaje: "Ya existe una cuenta registrada con este correo electrónico. Si ya tienes una cuenta, inicia sesión."
+          }
+        : { existe: false }
+    );
+  } catch (error) {
+    console.error("❌ Error verificando email:", error.message);
+    res.status(500).json({ mensaje: "Hubo un error al verificar el correo. Intenta más tarde." });
+  }
+};
+
 module.exports = {
   registrar,
   login,
@@ -278,4 +304,5 @@ module.exports = {
   verificarToken,
   obtenerCredencialPorId,
   cambiarRolUsuarioPorCorreo,
+  emailExiste,
 };

@@ -2,54 +2,58 @@ const express = require('express');
 const {
   registrar,
   login,
-  renovarToken, // ✅ nuevo
+  renovarToken,
   verificarToken,
   obtenerCredencialPorId,
-  cambiarRolUsuarioPorCorreo
+  cambiarRolUsuarioPorCorreo,
+  emailExiste, // ✅ agregamos verificación de email
 } = require('../controllers/authController');
 
 const {
   listarAdminsInterno,
   eliminarAdminInterno
-} = require('../controllers/adminInternoController'); // 👈 nuevo controlador para rutas internas
+} = require('../controllers/adminInternoController');
 
 const router = express.Router();
 
 // --------------------------
-// 🔓 Rutas públicas
+// 🔓 Rutas públicas (accesibles sin autenticación)
 // --------------------------
 
-// Registro de credenciales
+// Registro de usuario
 router.post('/registrar', registrar);
 
-// Login de usuario
+// Inicio de sesión
 router.post('/login', login);
 
-// 🔄 Renovar token (refreshToken)
-router.post('/refresh', renovarToken); // ✅ nueva ruta
+// Renovar accessToken con refreshToken
+router.post('/refresh', renovarToken);
 
-// Verificación de token (útil para frontend)
+// Verificar validez del token JWT
 router.get('/verificar', verificarToken, (req, res) => {
   res.json({
-    mensaje: "Token válido.",
-    usuario: req.usuario
+    mensaje: "Token válido ✅",
+    usuario: req.usuario,
   });
 });
 
-// Obtener credencial por ID (para microservicio de usuario)
+// Verificar si un correo ya está registrado
+router.post('/email-existe', emailExiste);
+
+// Obtener credencial por ID (uso interno por microservicios)
 router.get('/credencial/:id', obtenerCredencialPorId);
 
-// Cambiar rol de un usuario (por confirmación de invitación o panel interno)
+// Cambiar rol de usuario (puede usarse desde el panel interno o por invitación)
 router.put('/usuarios/rol', verificarToken, cambiarRolUsuarioPorCorreo);
 
 // --------------------------
-// 🔐 Rutas internas protegidas (uso desde otros microservicios)
+// 🔐 Rutas internas (solo accesibles con token válido)
 // --------------------------
 
-// Listar todos los administradores
+// Listar todos los administradores (uso interno)
 router.get('/interno/admins', verificarToken, listarAdminsInterno);
 
-// Eliminar un administrador por ID
+// Eliminar un administrador por su ID (uso interno)
 router.delete('/interno/admins/:id', verificarToken, eliminarAdminInterno);
 
 module.exports = router;

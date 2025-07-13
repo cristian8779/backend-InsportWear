@@ -1,5 +1,5 @@
 const generarPlantillaResetPassword = (nombre, token) => {
-  const url = `http://20.251.145.196:5000/reset-password.html?token=${token}`;
+const url = `https://api.soportee.store/reset-password.html?token=${token}`;
 
   return `
     <!DOCTYPE html>
