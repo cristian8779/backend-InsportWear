@@ -4,7 +4,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const conectarDB = require("./config/database");
-const { iniciarExpiracionAutomatica } = require("./config/cronjobs"); // 👈 Agregado
+const { iniciarExpiracionAutomatica } = require("./config/cronJobs"); // ✅ Corrección: 'cronJobs' con J mayúscula
 
 const app = express();
 
@@ -12,7 +12,7 @@ const app = express();
 conectarDB();
 
 // Iniciar cronjob
-iniciarExpiracionAutomatica(); // 👈 Aquí se lanza solo una vez
+iniciarExpiracionAutomatica(); // ✅ Ejecutar una vez al inicio
 
 // Middlewares
 app.use(cors());
