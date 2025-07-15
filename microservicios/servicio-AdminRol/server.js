@@ -4,11 +4,15 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const conectarDB = require("./config/database");
+const { iniciarExpiracionAutomatica } = require("./config/cronjobs"); // 👈 Agregado
 
 const app = express();
 
 // Conectar a la base de datos
 conectarDB();
+
+// Iniciar cronjob
+iniciarExpiracionAutomatica(); // 👈 Aquí se lanza solo una vez
 
 // Middlewares
 app.use(cors());
@@ -16,11 +20,10 @@ app.use(helmet());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// 👉 Asegurate de tener estos archivos:
+// Rutas
 const adminRoutes = require("./routes/adminRoutes");
 const rolRoutes = require("./routes/rolRoutes");
 
-// ✅ Usar routers, no controladores directamente
 app.use("/api/admin", adminRoutes);
 app.use("/api/rol", rolRoutes);
 

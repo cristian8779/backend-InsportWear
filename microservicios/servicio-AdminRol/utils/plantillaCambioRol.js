@@ -1,68 +1,76 @@
-const generarPlantillaRol = (nombre, nuevoRol, token) => {
-  // Asegurarse de que solo usamos el token, no un link malformado
-  const BASE_URL = "https://crud-master-api-uf7o.onrender.com";
-  const link = `${BASE_URL}/confirmar-rol.html?token=${encodeURIComponent(token)}`;
-
+const generarPlantillaRol = (nombre, nuevoRol, codigo) => {
   return `
   <!DOCTYPE html>
   <html lang="es">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Confirmación de cambio de rol</title>
     <style>
       body {
         margin: 0;
         padding: 0;
-        background-color: #f9f9f9;
+        background-color: #f5f5f5;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #333;
       }
       .container {
         max-width: 600px;
         margin: 40px auto;
-        background-color: #fff;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        border-left: 6px solid #e74c3c;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         overflow: hidden;
+        border-left: 5px solid #d32f2f;
       }
       .header {
+        background-color: #d32f2f;
+        padding: 20px;
         text-align: center;
-        padding: 30px 20px 10px;
       }
       .header h2 {
-        margin: 20px 0 10px;
-        color: #e74c3c;
+        margin: 0;
+        font-size: 22px;
+        color: #fff;
       }
       .body {
-        padding: 0 30px 30px;
+        padding: 30px;
+        text-align: center;
       }
       .body p {
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.6;
+        margin-bottom: 20px;
+      }
+      .code-box {
+        background-color: #fff2f2;
+        border: 2px dashed #d32f2f;
+        padding: 16px 28px;
+        border-radius: 8px;
+        font-size: 26px;
+        font-weight: bold;
+        letter-spacing: 6px;
+        color: #d32f2f;
+        display: inline-block;
         margin: 20px 0;
       }
-      .button-container {
-        text-align: center;
-        margin: 30px 0;
-      }
-      .button {
-        background-color: #e74c3c;
-        color: #fff;
-        padding: 14px 28px;
-        text-decoration: none;
-        font-weight: bold;
+      .mensaje-alerta {
+        font-size: 14px;
+        color: #d32f2f;
+        background-color: #fff0f0;
+        padding: 14px 16px;
+        border-left: 4px solid #d32f2f;
         border-radius: 6px;
-        font-size: 16px;
-        display: inline-block;
+        margin-top: 25px;
+        text-align: left;
       }
       .footer {
         font-size: 12px;
         color: #999;
         text-align: center;
-        padding: 20px 30px;
+        padding: 20px;
         border-top: 1px solid #eee;
+        background-color: #fafafa;
       }
     </style>
   </head>
@@ -72,13 +80,15 @@ const generarPlantillaRol = (nombre, nuevoRol, token) => {
         <h2>Invitación para cambio de rol</h2>
       </div>
       <div class="body">
-        <p>Hola <strong>${nombre}</strong>,</p>
-        <p>Se ha solicitado que tu cuenta adquiera el rol de <strong style="color:#e74c3c;">${nuevoRol}</strong> dentro de nuestra plataforma.</p>
-        <p>Este enlace estará activo por <strong>5 minutos</strong> y es válido una sola vez. Si deseas confirmar este cambio, haz clic en el botón:</p>
-        <div class="button-container">
-          <a class="button" href="${link}" target="_blank" rel="noopener noreferrer">Aceptar rol de ${nuevoRol}</a>
+        <p><strong>Hola ${nombre},</strong></p>
+        <p>Un SuperAdmin ha solicitado que tu cuenta obtenga el rol de <strong>${nuevoRol}</strong> dentro de nuestra plataforma.</p>
+        <p>Para aceptar el cambio, ingresa este código desde la app:</p>
+        <div class="code-box">${codigo}</div>
+        <p>Este código expira en <strong>5 minutos</strong> y solo es válido una vez.</p>
+
+        <div class="mensaje-alerta">
+          Para aceptar esta invitación, primero debes <strong>iniciar sesión en la app</strong> y luego dirigirte a la sección de verificación de rol para ingresar el código.
         </div>
-        <p>Si no reconoces esta solicitud, simplemente ignora este correo. No se aplicará ningún cambio si no confirmas.</p>
       </div>
       <div class="footer">
         © ${new Date().getFullYear()} Soportee. Todos los derechos reservados.
