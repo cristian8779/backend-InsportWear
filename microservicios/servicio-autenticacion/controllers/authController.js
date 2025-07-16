@@ -253,23 +253,7 @@ const obtenerCredencialPorId = async (req, res) => {
   }
 };
 
-// ✅ Cambiar rol de un usuario por correo
-const cambiarRolUsuarioPorCorreo = async (req, res) => {
-  const { email, nuevoRol } = req.body;
-  const rolSolicitante = req.usuario?.rol;
 
-  if (!email || !nuevoRol) {
-    return res.status(400).json({ mensaje: "Por favor, proporciona el correo y el nuevo rol del usuario." });
-  }
-
-  const resultado = await actualizarRolDeUsuario({ email, nuevoRol, rolSolicitante });
-
-  return res.status(resultado.status).json({
-    ok: resultado.ok,
-    mensaje: resultado.mensaje,
-    ...(resultado.error && { error: resultado.error }),
-  });
-};
 
 // ✅ Verificar si un email ya está registrado
 const emailExiste = async (req, res) => {
@@ -303,6 +287,5 @@ module.exports = {
   renovarToken,
   verificarToken,
   obtenerCredencialPorId,
-  cambiarRolUsuarioPorCorreo,
   emailExiste,
 };

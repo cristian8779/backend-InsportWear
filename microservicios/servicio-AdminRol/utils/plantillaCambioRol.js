@@ -5,91 +5,104 @@ const generarPlantillaRol = (nombre, nuevoRol, codigo) => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Confirmación de cambio de rol</title>
+    <title>Invitación</title>
     <style>
       body {
         margin: 0;
         padding: 0;
-        background-color: #f5f5f5;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #333;
+        background-color: #f0f2f5;
+        font-family: 'Inter', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
       }
-      .container {
-        max-width: 600px;
-        margin: 40px auto;
+
+      .card {
         background-color: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        overflow: hidden;
-        border-left: 5px solid #d32f2f;
-      }
-      .header {
-        background-color: #d32f2f;
-        padding: 20px;
+        max-width: 480px;
+        width: 100%;
+        padding: 40px 30px;
+        border-radius: 18px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.07);
         text-align: center;
+        position: relative;
       }
-      .header h2 {
-        margin: 0;
+
+      .emoji {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+
+      .card h2 {
         font-size: 22px;
-        color: #fff;
+        margin-bottom: 14px;
+        color: #111827;
       }
-      .body {
-        padding: 30px;
-        text-align: center;
+
+      .card p {
+        font-size: 16px;
+        color: #374151;
+        margin-bottom: 22px;
+        line-height: 1.5;
       }
-      .body p {
-        font-size: 15px;
-        line-height: 1.6;
-        margin-bottom: 20px;
-      }
-      .code-box {
-        background-color: #fff2f2;
-        border: 2px dashed #d32f2f;
-        padding: 16px 28px;
-        border-radius: 8px;
-        font-size: 26px;
-        font-weight: bold;
+
+      .code {
+        background-color: #fef2f2;
+        color: #dc2626;
+        font-weight: 700;
+        font-size: 28px;
         letter-spacing: 6px;
-        color: #d32f2f;
+        border-radius: 10px;
+        padding: 18px 28px;
         display: inline-block;
         margin: 20px 0;
+        border: 2px dashed #dc2626;
       }
-      .mensaje-alerta {
+
+      .alerta {
+        margin-top: 30px;
+        background-color: #fef2f2;
+        border-left: 5px solid #ef4444;
+        padding: 16px;
+        border-radius: 8px;
         font-size: 14px;
-        color: #d32f2f;
-        background-color: #fff0f0;
-        padding: 14px 16px;
-        border-left: 4px solid #d32f2f;
-        border-radius: 6px;
-        margin-top: 25px;
+        color: #991b1b;
         text-align: left;
       }
+
       .footer {
+        margin-top: 35px;
         font-size: 12px;
-        color: #999;
-        text-align: center;
-        padding: 20px;
-        border-top: 1px solid #eee;
-        background-color: #fafafa;
+        color: #9ca3af;
+      }
+
+      @media (max-width: 480px) {
+        .code {
+          font-size: 24px;
+        }
+        .card {
+          padding: 30px 20px;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div class="header">
-        <h2>Invitación para cambio de rol</h2>
-      </div>
-      <div class="body">
-        <p><strong>Hola ${nombre},</strong></p>
-        <p>Un SuperAdmin ha solicitado que tu cuenta obtenga el rol de <strong>${nuevoRol}</strong> dentro de nuestra plataforma.</p>
-        <p>Para aceptar el cambio, ingresa este código desde la app:</p>
-        <div class="code-box">${codigo}</div>
-        <p>Este código expira en <strong>5 minutos</strong> y solo es válido una vez.</p>
+    <div class="card">
+      <div class="emoji">📬</div>
+      <h2>Hola ${nombre},</h2>
+      <p>Has sido invitado a asumir el rol de <strong>${nuevoRol}</strong> en nuestra plataforma.</p>
+      <p>Usa este código para confirmar tu cambio de rol:</p>
 
-        <div class="mensaje-alerta">
-          Para aceptar esta invitación, primero debes <strong>iniciar sesión en la app</strong> y luego dirigirte a la sección de verificación de rol para ingresar el código.
-        </div>
+      <div class="code">${codigo}</div>
+
+      <p>Este código expira en <strong>5 minutos</strong> y solo puede usarse una vez.</p>
+
+      <div class="alerta">
+        ✅ Primero inicia sesión en la app.<br/>
+        🔐 Luego dirígete a <strong>Verificación de rol</strong> y pega el código.
       </div>
+
       <div class="footer">
         © ${new Date().getFullYear()} Soportee. Todos los derechos reservados.
       </div>

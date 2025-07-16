@@ -5,14 +5,23 @@ const {
   renovarToken,
   verificarToken,
   obtenerCredencialPorId,
-  cambiarRolUsuarioPorCorreo,
-  emailExiste, // ✅ agregamos verificación de email
+  emailExiste,
 } = require('../controllers/authController');
 
 const {
   listarAdminsInterno,
   eliminarAdminInterno
 } = require('../controllers/adminInternoController');
+
+// ✅ Nuevo controlador para obtener usuario por email
+const {
+  obtenerUsuarioPorEmail
+} = require('../controllers/usuarioAuth.controller');
+
+// ✅ Nuevo controlador separado para cambiar rol
+const {
+  cambiarRolUsuarioPorCorreo
+} = require('../controllers/cambiarRolUsuarioPorCorreo'); // <== Asegúrate que la ruta sea correcta
 
 const router = express.Router();
 
@@ -43,7 +52,10 @@ router.post('/email-existe', emailExiste);
 // Obtener credencial por ID (uso interno por microservicios)
 router.get('/credencial/:id', obtenerCredencialPorId);
 
-// Cambiar rol de usuario (puede usarse desde el panel interno o por invitación)
+// ✅ NUEVA ruta: Obtener usuario por email (uso interno para cambio de rol)
+router.get('/usuarios/:email', obtenerUsuarioPorEmail);
+
+// ✅ NUEVA ruta: Cambiar rol usando nuevo controller
 router.put('/usuarios/rol', verificarToken, cambiarRolUsuarioPorCorreo);
 
 // --------------------------

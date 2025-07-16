@@ -7,21 +7,29 @@ const AUTH_URL = process.env.AUTH_URL;
 
 // 🔧 Obtener usuario externo por email
 const getUsuarioPorEmail = async (email) => {
+  if (!AUTH_URL) {
+    console.error("❌ AUTH_URL no está definido en el archivo .env");
+    return null;
+  }
+
   try {
     const response = await axios.get(`${AUTH_URL}/usuarios/${email}`, {
       timeout: 3000,
     });
+
     return response.data.usuario;
   } catch (error) {
-    console.error("❌ Error al contactar el servicio de autenticación:", error.message);
+    console.error(
+      "❌ Error al contactar el servicio de autenticación:",
+      error?.response?.data?.mensaje || error.message
+    );
     return null;
   }
 };
 
 // ✅ Enviar código para cambio de rol
 const invitarCambioRol = async (req, res) => {
-  const rawEmail = req.body.email;
-  const nuevoRol = req.body.nuevoRol;
+  const { email: rawEmail, nuevoRol } = req.body;
 
   if (!rawEmail || !nuevoRol) {
     return res.status(400).json({
@@ -40,21 +48,24 @@ const invitarCambioRol = async (req, res) => {
 
   if (req.usuario.rol !== "superAdmin") {
     return res.status(403).json({
-      mensaje: "Acceso denegado. Solo el SuperAdmin puede enviar invitaciones de cambio de rol.",
+      mensaje:
+        "Acceso denegado. Solo el SuperAdmin puede enviar invitaciones de cambio de rol.",
     });
   }
 
   const credencial = await getUsuarioPorEmail(email);
   if (!credencial) {
     return res.status(404).json({
-      mensaje: "No se encontró un usuario registrado con ese correo electrónico.",
+      mensaje:
+        "No se encontró un usuario registrado con ese correo electrónico.",
     });
   }
 
   const yaExiste = await RolRequest.findOne({ email, estado: "pendiente" });
   if (yaExiste) {
     return res.status(409).json({
-      mensaje: "Este usuario ya tiene una invitación pendiente. Espera a que se confirme o expire.",
+      mensaje:
+        "Este usuario ya tiene una invitación pendiente. Espera a que se confirme o expire.",
     });
   }
 
@@ -69,19 +80,26 @@ const invitarCambioRol = async (req, res) => {
     estado: "pendiente",
   }).save();
 
-  await resend.emails.send({
-    from: "Soporte <soporte@soportee.store>",
-    to: email,
-    subject: `Código para cambio de rol a: ${nuevoRol}`,
-    html: generarPlantillaRol(credencial.nombre || email, nuevoRol, codigo),
-  });
+  try {
+    await resend.emails.send({
+      from: "Soporte <soporte@soportee.store>",
+      to: email,
+      subject: `Código para cambio de rol a: ${nuevoRol}`,
+      html: generarPlantillaRol(credencial.nombre || email, nuevoRol, codigo),
+    });
 
-  console.log(`📨 Código enviado a ${email} para cambio de rol a ${nuevoRol}`);
+    console.log(`📨 Código enviado a ${email} para cambio de rol a ${nuevoRol}`);
 
-  return res.status(200).json({
-    mensaje: `✅ El código fue enviado correctamente a ${email}. El usuario tiene 5 minutos para ingresarlo y confirmar el cambio.`,
-    expiracion: expiracion.toISOString(),
-  });
+    return res.status(200).json({
+      mensaje: `✅ El código fue enviado correctamente a ${email}. El usuario tiene 5 minutos para ingresarlo y confirmar el cambio.`,
+      expiracion: expiracion.toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error al enviar el correo:", error.message);
+    return res.status(500).json({
+      mensaje: "Ocurrió un error al enviar el correo. Intenta nuevamente.",
+    });
+  }
 };
 
 // ✅ Confirmar código desde app o web
@@ -90,36 +108,58 @@ const confirmarCodigoRol = async (req, res) => {
 
   if (!email || !codigo) {
     return res.status(400).json({
-      mensaje: "Faltan datos. Proporcione el correo electrónico y el código recibido.",
+      mensaje:
+        "Faltan datos. Proporcione el correo electrónico y el código recibido.",
     });
   }
 
   const sanitizedEmail = email.trim().toLowerCase();
-  const solicitud = await RolRequest.findOne({ email: sanitizedEmail, codigo, estado: "pendiente" });
+
+  const solicitud = await RolRequest.findOne({
+    email: sanitizedEmail,
+    codigo,
+    estado: "pendiente",
+  });
 
   if (!solicitud) {
     return res.status(404).json({
-      mensaje: "El código es inválido, ya fue utilizado o no coincide con el correo ingresado.",
+      mensaje:
+        "El código es inválido, ya fue utilizado o no coincide con el correo ingresado.",
     });
   }
 
   if (solicitud.expiracion < new Date()) {
     solicitud.estado = "expirado";
     await solicitud.save();
+
     return res.status(400).json({
       mensaje: "⏰ El código ha expirado. Solicite una nueva invitación.",
     });
   }
 
+  // Actualizar el rol
   try {
-    await axios.put(`${AUTH_URL}/usuarios/rol`, {
-      email: sanitizedEmail,
-      nuevoRol: solicitud.nuevoRol,
-    }, { timeout: 3000 });
+    await axios.put(
+      `${AUTH_URL}/usuarios/rol`,
+      {
+        email: sanitizedEmail,
+        nuevoRol: solicitud.nuevoRol,
+      },
+      {
+        timeout: 3000,
+        headers: {
+          Authorization: req.headers.authorization, // ✅ reenviar el token del SuperAdmin
+        },
+      }
+    );
   } catch (error) {
-    console.error("⚠️ Error al actualizar el rol:", error.response?.data || error.message);
+    console.error(
+      "⚠️ Error al actualizar el rol:",
+      error.response?.data || error.message
+    );
     return res.status(502).json({
-      mensaje: "No se pudo confirmar el cambio de rol en este momento. Intente nuevamente más tarde.",
+      mensaje:
+        "No se pudo confirmar el cambio de rol en este momento. Intente nuevamente más tarde.",
     });
   }
 
@@ -152,9 +192,10 @@ const listarInvitacionesRol = async (req, res) => {
 
     return res.status(200).json({ invitaciones: resultado });
   } catch (error) {
-    console.error("❌ Error al obtener las invitaciones:", error);
+    console.error("❌ Error al obtener las invitaciones:", error.message);
     return res.status(500).json({
-      mensaje: "Hubo un problema al cargar las invitaciones. Intente nuevamente más tarde.",
+      mensaje:
+        "Hubo un problema al cargar las invitaciones. Intente nuevamente más tarde.",
     });
   }
 };
