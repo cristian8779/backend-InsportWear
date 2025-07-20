@@ -2,11 +2,24 @@ const mongoose = require('mongoose');
 
 // 📦 Subdocumento para variaciones del producto
 const VariacionSchema = new mongoose.Schema({
-  talla: {
-    type: String,
-    required: [true, 'La talla es obligatoria'],
-    trim: true
+  // Ahora permitimos dos formas de identificar la talla: número y letra
+  tallaNumero: {
+    type: String, // Puede ser string para permitir valores como "38", "40.5", etc.
+    trim: true,
+    // No es requerido, pero al menos uno de los dos (tallaNumero o tallaLetra) debe estar presente (validación en controlador)
+    // required: false
   },
+  tallaLetra: {
+    type: String, // Ejemplo: "M", "L", "XL"
+    trim: true,
+    // required: false
+  },
+  // Eliminamos el campo talla antiguo
+  // talla: {
+  //   type: String,
+  //   required: [true, 'La talla es obligatoria'],
+  //   trim: true
+  // },
   color: {
     type: String,
     required: [true, 'El color es obligatorio'],

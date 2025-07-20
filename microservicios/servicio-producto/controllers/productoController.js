@@ -37,6 +37,12 @@ const crearProducto = async (req, res) => {
         if (!Array.isArray(variacionesParseadas) || variacionesParseadas.length === 0) {
           return res.status(400).json({ mensaje: '⚠️ Debes agregar al menos una variación válida del producto.' });
         }
+        // Validación personalizada: cada variación debe tener al menos tallaNumero o tallaLetra
+        for (const v of variacionesParseadas) {
+          if (!v.tallaNumero && !v.tallaLetra) {
+            return res.status(400).json({ mensaje: 'Cada variación debe tener al menos tallaNumero o tallaLetra.' });
+          }
+        }
         stockFinal = 0; // Se ignora el stock general si hay variaciones
       } catch {
         return res.status(400).json({ mensaje: '⚠️ Error al procesar las variaciones. Debe ser un JSON válido.' });
@@ -75,7 +81,8 @@ const obtenerProductos = async (req, res) => {
     const productos = await Producto.find();
 
     const subcategoriasSet = new Set();
-    const tallasSet = new Set();
+    const tallasNumeroSet = new Set();
+    const tallasLetraSet = new Set();
     const coloresSet = new Set();
 
     productos.forEach(producto => {
@@ -83,7 +90,9 @@ const obtenerProductos = async (req, res) => {
 
       if (Array.isArray(producto.variaciones)) {
         producto.variaciones.forEach(variacion => {
-          if (variacion.talla) tallasSet.add(variacion.talla);
+          // Agregamos ambos tipos de talla a los filtros
+          if (variacion.tallaNumero) tallasNumeroSet.add(variacion.tallaNumero);
+          if (variacion.tallaLetra) tallasLetraSet.add(variacion.tallaLetra);
           if (variacion.color) coloresSet.add(variacion.color);
         });
       }
@@ -91,7 +100,8 @@ const obtenerProductos = async (req, res) => {
 
     const filtrosDisponibles = {
       subcategorias: Array.from(subcategoriasSet),
-      tallas: Array.from(tallasSet),
+      tallasNumero: Array.from(tallasNumeroSet),
+      tallasLetra: Array.from(tallasLetraSet),
       colores: Array.from(coloresSet)
     };
 
@@ -170,6 +180,12 @@ const actualizarProducto = async (req, res) => {
         const variacionesParseadas = JSON.parse(variaciones);
         if (!Array.isArray(variacionesParseadas) || variacionesParseadas.length === 0) {
           return res.status(400).json({ mensaje: '⚠️ Debes ingresar al menos una variación válida.' });
+        }
+        // Validación personalizada: cada variación debe tener al menos tallaNumero o tallaLetra
+        for (const v of variacionesParseadas) {
+          if (!v.tallaNumero && !v.tallaLetra) {
+            return res.status(400).json({ mensaje: 'Cada variación debe tener al menos tallaNumero o tallaLetra.' });
+          }
         }
         actualizaciones.variaciones = variacionesParseadas;
         actualizaciones.stock = 0;
@@ -269,7 +285,8 @@ const reducirStock = async (req, res) => {
 // 📉 Reducir stock de una variación
 const reducirStockVariacion = async (req, res) => {
   try {
-    const { cantidad, talla, color } = req.body;
+    // Ahora permitimos buscar la variación por tallaNumero o tallaLetra
+    const { cantidad, tallaNumero, tallaLetra, color } = req.body;
     const { id } = req.params;
 
     const producto = await Producto.findById(id);
@@ -278,7 +295,9 @@ const reducirStockVariacion = async (req, res) => {
     }
 
     const variacion = producto.variaciones.find(
-      (v) => v.talla === talla && v.color === color
+      (v) =>
+        v.color === color &&
+        ((tallaNumero && v.tallaNumero === tallaNumero) || (tallaLetra && v.tallaLetra === tallaLetra))
     );
 
     if (!variacion) {
