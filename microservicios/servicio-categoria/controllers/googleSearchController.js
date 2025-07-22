@@ -8,13 +8,18 @@ const SearchQuota = require('../models/SearchQuota'); // Modelo para controlar e
  * Solo accesible por admin o superAdmin
  */
 const buscarImagenesGoogleController = async (req, res) => {
-  const { query } = req.query;
+  let { query, page = 1, limit = 20 } = req.query;
 
+  // Validar que query esté presente
   if (!query) {
     return res.status(400).json({
       mensaje: "🔍 Para ayudarte mejor, por favor ingresa un término de búsqueda. Ejemplo: 'zapatillas', 'raqueta', 'camisa'."
     });
   }
+
+  // Validar que `page` y `limit` sean números válidos
+  page = Math.max(1, parseInt(page));  // Asegura que la página sea al menos 1
+  limit = Math.max(1, parseInt(limit)); // Asegura que el límite sea al menos 1
 
   try {
     // Verificar cuota diaria
@@ -36,9 +41,10 @@ const buscarImagenesGoogleController = async (req, res) => {
       await cuota.save();
     }
 
-    const imagenes = await buscarImagenesGoogle(query, 10);
+    // Buscar imágenes con paginación
+    const imagenes = await buscarImagenesGoogle(query, limit, (page - 1) * limit);
 
-    if (!imagenes.length) {
+    if (!imagenes || imagenes.length === 0) {
       return res.status(404).json({
         mensaje: `😕 No se encontraron resultados para "${query}".`,
         sugerencia: "Te recomendamos usar términos más específicos. Evita palabras muy generales como 'ropa', 'producto' o 'color'.",
@@ -47,9 +53,18 @@ const buscarImagenesGoogleController = async (req, res) => {
       });
     }
 
+    // Preparar la respuesta con solo los detalles necesarios
+    const resultados = imagenes.map((imagen) => ({
+      url: imagen.url,                          // URL de la imagen
+      titulo: imagen.titulo || 'Sin título',     // Título de la imagen
+      origen: imagen.origen || 'Desconocido'     // URL de la página de origen
+    }));
+
     res.status(200).json({
       mensaje: `✅ Se encontraron imágenes relacionadas con: "${query}". Selecciona la que mejor represente tu categoría.`,
-      resultados: imagenes,
+      resultados,
+      pagina_actual: page,
+      resultados_por_pagina: limit,
       busquedas_restantes: Math.max(100 - cuota.usadas, 0),
       limite_diario: 100
     });
@@ -59,7 +74,7 @@ const buscarImagenesGoogleController = async (req, res) => {
     res.status(500).json({
       mensaje: '💥 Lo sentimos, ocurrió un problema al intentar contactar el buscador de imágenes.',
       sugerencia: 'Por favor, intenta nuevamente más tarde.',
-      error: error.message
+      error: error.response ? error.response.data : error.message // Detalles del error
     });
   }
 };
