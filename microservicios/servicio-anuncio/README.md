@@ -2,53 +2,89 @@
 
 # Servicio Anuncio
 
-Este proyecto es un microservicio para gestionar anuncios. Permite realizar operaciones CRUD (Crear, Leer, Actualizar, Eliminar) sobre los anuncios.
+## ¿Qué hace este microservicio?
+Gestiona anuncios publicados en la plataforma. Permite crear, listar, actualizar y eliminar anuncios, así como limpiar automáticamente los anuncios vencidos.
 
-## Estructura del Proyecto
+---
 
-- **controllers/**: Contiene la lógica de negocio para manejar los anuncios.
-- **middlewares/**: Incluye funciones middleware para la autenticación y autorización.
-- **models/**: Define el modelo de datos para los anuncios utilizando Mongoose.
-- **routes/**: Configura las rutas para las operaciones de anuncios.
-- **server.js**: Punto de entrada de la aplicación, configura el servidor Express y las conexiones a la base de datos.
-- **package.json**: Archivo de configuración de npm que lista las dependencias del proyecto.
+## Instalación y ejecución paso a paso
 
-## Instalación
-
-1. Clona el repositorio:
+1. **Ubícate en la carpeta del servicio:**
+   ```bash
+   cd microservicios/servicio-anuncio
    ```
-   git clone <URL_DEL_REPOSITORIO>
-   ```
-2. Navega al directorio del proyecto:
-   ```
-   cd servicio-anuncio
-   ```
-3. Instala las dependencias:
-   ```
+2. **Instala las dependencias necesarias:**
+   ```bash
    npm install
    ```
+3. **Inicia el microservicio:**
+   ```bash
+   npm start
+   ```
+   - Para desarrollo con recarga automática:
+     ```bash
+     npm run dev
+     ```
 
-## Uso
+---
 
-Para iniciar el servidor, ejecuta el siguiente comando:
-```
-npm start
-```
+## Endpoints principales y ejemplos de uso
 
-El servidor estará corriendo en `http://localhost:3000` (o el puerto que hayas configurado).
+### Crear anuncio
+- **POST** `/api/anuncios`
+- **Requiere:** Token JWT válido y datos del anuncio.
+- **Ejemplo de body (JSON):**
+  ```json
+  {
+    "titulo": "Oferta especial",
+    "descripcion": "Descuento en zapatillas",
+    "imagen": "(archivo de imagen, multipart/form-data)"
+  }
+  ```
 
-## Rutas
+### Listar anuncios
+- **GET** `/api/anuncios`
+- **Respuesta ejemplo:**
+  ```json
+  [
+    { "_id": "...", "titulo": "Oferta especial", "descripcion": "...", "imagen": "url" }
+  ]
+  ```
 
-- `POST /api/anuncios`: Crear un nuevo anuncio.
-- `GET /api/anuncios`: Obtener todos los anuncios.
-- `GET /api/anuncios/:id`: Obtener un anuncio por ID.
-- `PUT /api/anuncios/:id`: Actualizar un anuncio por ID.
-- `DELETE /api/anuncios/:id`: Eliminar un anuncio por ID.
+### Eliminar anuncio
+- **DELETE** `/api/anuncios/:id`
+- **Requiere:** Token JWT válido.
 
-## Contribuciones
+---
 
-Las contribuciones son bienvenidas. Si deseas contribuir, por favor abre un issue o envía un pull request.
+## Cosas importantes y tips
+- **Imágenes:** Las imágenes se suben automáticamente a Cloudinary.
+- **Limpieza automática:** El servicio ejecuta un job para eliminar anuncios vencidos.
+- **Autenticación:** El token JWT es obligatorio para crear/eliminar anuncios. Agrégalo en el header:
+  ```
+  Authorization: Bearer <tu_token>
+  ```
+- **Errores comunes:**
+  - No enviar el token o enviar uno inválido.
+  - No enviar el título del anuncio.
+- **Recomendación:** Siempre revisa la respuesta del endpoint para confirmar la operación.
 
-## Licencia
+---
 
-Este proyecto está bajo la Licencia MIT.
+## Estructura de carpetas explicada
+- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
+- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
+- `routes/` — Definición de rutas y métodos HTTP
+- `middlewares/` — Funciones para autenticación y subida de archivos
+- `config/` — Configuración de base de datos y servicios externos
+- `jobs/` — Tareas programadas para limpieza automática
+
+---
+
+## Pruebas rápidas
+Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+
+---
+
+## ¿A quién preguntar dudas?
+Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
