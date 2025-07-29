@@ -1,5 +1,4 @@
-// config/redis.js
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const urlBase = process.env.REDIS_URL;
 const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -13,7 +12,6 @@ const redisClient = {
     return res.json();
   },
   async set(key, value, options = {}) {
-    // Upstash permite pasar opciones como { EX: segundos }
     let url = `${urlBase}/set/${key}/${value}`;
     if (options.EX) url += `?EX=${options.EX}`;
     const res = await fetch(url, {
