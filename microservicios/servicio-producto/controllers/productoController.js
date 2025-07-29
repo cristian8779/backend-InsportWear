@@ -2,6 +2,7 @@ const Producto = require('../models/Producto');
 const cloudinary = require('../config/cloudinary');
 const Historial = require('../models/Historial');
 const axios = require('axios');
+const redisClient = require('../config/redis');
 
 // 📦 Crear un producto
 const crearProducto = async (req, res) => {
@@ -68,6 +69,8 @@ const crearProducto = async (req, res) => {
     });
 
     await nuevoProducto.save();
+    // Limpia caché
+    await redisClient.del('productos_todos');
     res.status(201).json({ mensaje: '✅ ¡Producto agregado exitosamente!', producto: nuevoProducto });
   } catch (error) {
     console.error("❌ Error en crearProducto:", error);
@@ -77,7 +80,14 @@ const crearProducto = async (req, res) => {
 
 // 📄 Obtener todos los productos con filtros dinámicos
 const obtenerProductos = async (req, res) => {
+  const cacheKey = 'productos_todos';
   try {
+    const cache = await redisClient.get(cacheKey);
+    if (cache && cache.result) {
+      console.log('🟢 Productos cargados desde Redis');
+      return res.json(JSON.parse(cache.result));
+    }
+
     const productos = await Producto.find();
 
     const subcategoriasSet = new Set();
@@ -87,13 +97,11 @@ const obtenerProductos = async (req, res) => {
 
     productos.forEach(producto => {
       if (producto.subcategoria) subcategoriasSet.add(producto.subcategoria);
-
       if (Array.isArray(producto.variaciones)) {
-        producto.variaciones.forEach(variacion => {
-          // Agregamos ambos tipos de talla a los filtros
-          if (variacion.tallaNumero) tallasNumeroSet.add(variacion.tallaNumero);
-          if (variacion.tallaLetra) tallasLetraSet.add(variacion.tallaLetra);
-          if (variacion.color) coloresSet.add(variacion.color);
+        producto.variaciones.forEach(v => {
+          if (v.tallaNumero) tallasNumeroSet.add(v.tallaNumero);
+          if (v.tallaLetra) tallasLetraSet.add(v.tallaLetra);
+          if (v.color) coloresSet.add(v.color);
         });
       }
     });
@@ -105,7 +113,11 @@ const obtenerProductos = async (req, res) => {
       colores: Array.from(coloresSet)
     };
 
-    res.json({ productos, filtrosDisponibles });
+    const response = { productos, filtrosDisponibles };
+    await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
+
+    console.log('🟡 Productos cargados desde DB y guardados en Redis');
+    res.json(response);
   } catch (error) {
     console.error("❌ Error al obtener productos:", error);
     res.status(500).json({ mensaje: '❌ Error al cargar productos.', error: error.message });
@@ -203,6 +215,7 @@ const actualizarProducto = async (req, res) => {
     }
 
     producto = await Producto.findByIdAndUpdate(id, actualizaciones, { new: true });
+    await redisClient.del('productos_todos');
     res.json({ mensaje: '✅ Producto actualizado correctamente.', producto });
   } catch (error) {
     console.error("❌ Error en actualizarProducto:", error);
@@ -228,6 +241,7 @@ const eliminarProducto = async (req, res) => {
     }
 
     await Producto.findByIdAndDelete(id);
+    await redisClient.del('productos_todos');
     res.json({ mensaje: '✅ Producto eliminado exitosamente.' });
   } catch (error) {
     console.error("❌ Error en eliminarProducto:", error);
