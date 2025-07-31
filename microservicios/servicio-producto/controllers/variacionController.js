@@ -91,6 +91,7 @@ const obtenerVariaciones = async (req, res) => {
 
         let variacionesFiltradas = producto.variaciones;
 
+        // Filtramos las variaciones según los parámetros de consulta
         if (tallaNumero) {
             variacionesFiltradas = variacionesFiltradas.filter(
                 (v) => v.tallaNumero && v.tallaNumero.toString() === tallaNumero.toString()
@@ -110,20 +111,44 @@ const obtenerVariaciones = async (req, res) => {
             console.log(`🔍 Filtrando por color: "${color}"`);
         }
 
+        // --- ✨ CORRECCIÓN APLICADA AQUÍ: Generación de filtros sin duplicados y normalizados ✨ ---
         const tallasNumeroSet = new Set();
         const tallasLetraSet = new Set();
         const coloresSet = new Set();
+        const subcategoriasSet = new Set(); // Para subcategorías del producto principal
 
+        // Recolecta subcategorías del producto principal
+        if (producto.subcategoria) { // Asumiendo que `subcategoria` es un solo string
+            subcategoriasSet.add(producto.subcategoria);
+        }
+        // Si `producto.subcategorias` fuera un array, harías:
+        // if (producto.subcategorias && Array.isArray(producto.subcategorias)) {
+        //     producto.subcategorias.forEach(sub => subcategoriasSet.add(sub));
+        // }
+
+
+        // Recolecta y normaliza datos de las variaciones
         producto.variaciones.forEach(v => {
-            if (v.tallaNumero) tallasNumeroSet.add(v.tallaNumero);
-            if (v.tallaLetra) tallasLetraSet.add(v.tallaLetra);
-            if (v.color) coloresSet.add(v.color);
+            if (v.tallaNumero) tallasNumeroSet.add(v.tallaNumero.toString()); // Convertir a string para consistencia
+            if (v.tallaLetra) tallasLetraSet.add(v.tallaLetra.toUpperCase()); // Normalizar a MAYÚSCULAS
+            if (v.color) coloresSet.add(v.color.charAt(0).toUpperCase() + v.color.slice(1).toLowerCase()); // Normalizar: "Azul", "Negro"
         });
 
         const filtrosDisponibles = {
-            tallasNumero: Array.from(tallasNumeroSet).sort((a, b) => a - b),
+            // Convierte Set a Array, parsea a número para ordenar, luego convierte de vuelta a string
+            tallasNumero: Array.from(tallasNumeroSet)
+                                .map(Number)
+                                .sort((a, b) => a - b)
+                                .map(String),
+
+            // Convierte Set a Array y ordena alfabéticamente
             tallasLetra: Array.from(tallasLetraSet).sort(),
+
+            // Convierte Set a Array y ordena alfabéticamente
             colores: Array.from(coloresSet).sort(),
+
+            // Añade subcategorías del producto principal
+            subcategorias: Array.from(subcategoriasSet).sort(),
         };
 
         console.log(`🌟 ¡Variaciones obtenidas! Mostrando ${variacionesFiltradas.length} opciones para el producto con ID ${productoId}.`);
