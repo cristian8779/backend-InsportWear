@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pago con Bold</title>
+</head>
+<body>
+  <h1>Pagar con Bold</h1>
+  <button id="pagarBtn">Pagar ahora</button>
+
+  <script>
+    const userId = "usuario-demo-123"; // Usuario fijo de prueba
+    const dominio = "https://api.soportee.store"; // Usamos el dominio con rutas limpias
+
+    document.getElementById("pagarBtn").addEventListener("click", async () => {
+      try {
+        const res = await fetch(`${dominio}/pago/firma/generar-firma`, { // ✅ Ruta limpia con proxy
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+
+        const { orderId, amount, currency, firma } = await res.json();
+
+        const apiKey = "dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU";
+        const urlBold = new URL("https://checkout.bold.co");
+
+        urlBold.searchParams.append("data-api-key", apiKey);
+        urlBold.searchParams.append("order-id", orderId);
+        urlBold.searchParams.append("amount", amount);
+        urlBold.searchParams.append("currency", currency);
+        urlBold.searchParams.append("signature", firma);
+        urlBold.searchParams.append("redirect-url", `${dominio}/confirmacion.html`);
+
+        window.location.href = urlBold.toString();
+      } catch (err) {
+        alert("Error generando firma: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

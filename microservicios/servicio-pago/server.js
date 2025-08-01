@@ -1,12 +1,11 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const conectarDB = require('./config/database');
 const pagoRoutes = require('./routes/pagoRoutes');
 const firmaRoutes = require('./routes/firmaRoutes');
-
-
 
 const app = express();
 const PORT = process.env.PORT || 3007;
@@ -22,6 +21,9 @@ app.use(express.json());
 // 📦 Rutas de pago (ej: POST /api/pagos/crear)
 app.use('/api/pagos', pagoRoutes);
 app.use('/api/firmas', firmaRoutes);
+
+// 🗂 Servir archivos estáticos (HTML, JS, etc.) desde la carpeta "public"
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ❌ Ruta no encontrada
 app.use((req, res) => {

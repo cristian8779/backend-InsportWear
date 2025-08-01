@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 
+/**
+ * @file Modelo de Mongoose para el Producto.
+ * @description Define el esquema para los productos y sus variaciones.
+ */
+
 // 📦 Subdocumento para variaciones del producto
 const VariacionSchema = new mongoose.Schema({
     tallaNumero: {
@@ -13,12 +18,12 @@ const VariacionSchema = new mongoose.Schema({
     color: {
         nombre: {
             type: String,
-            required: [true, 'El nombre del color es obligatorio'],
+            required: false, // CORREGIDO: Ahora es opcional para evitar errores de validación con datos antiguos.
             trim: true,
         },
         hex: {
             type: String,
-            required: [true, 'El código hexadecimal del color es obligatorio'],
+            required: false, // CORREGIDO: Ahora es opcional.
             trim: true,
             match: [/^#([0-9A-Fa-f]{6})$/, 'El formato del color debe ser hexadecimal (ej. #FF0000)']
         }
@@ -36,9 +41,11 @@ const VariacionSchema = new mongoose.Schema({
     ],
     precio: {
         type: Number,
+        // Se añade required para asegurar que el precio siempre se defina.
+        required: [true, 'El precio de variación es obligatorio'],
         min: [0, 'El precio de variación no puede ser negativo']
     }
-}, { _id: true }); // ✨ Cada variación tiene su propio ID único
+}, { _id: true }); // Cada variación tiene su propio ID único
 
 // 🛍️ Esquema principal del producto
 const ProductoSchema = new mongoose.Schema({

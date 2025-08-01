@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Confirmación de Pago</title>
+</head>
+<body>
+  <h2>Procesando pago...</h2>
+  <div id="resultado"></div>
+
+  <script>
+    async function confirmarPago() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get("order-id");
+      const estado = params.get("payment_status");
+      const userId = "usuario-demo-123"; // Usuario de prueba
+
+      if (!orderId || !estado) {
+        document.getElementById("resultado").innerText = "❌ Error: Faltan parámetros en la URL.";
+        return;
+      }
+
+      if (estado !== "APPROVED") {
+        document.getElementById("resultado").innerText = "⚠️ Pago rechazado o pendiente.";
+        return;
+      }
+
+      try {
+        const dominio = "https://api.soportee.store"; // Dominio final
+
+        const res = await fetch(`${dominio}/pago/confirmar`, { // ✅ Ruta limpia con proxy
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, userId }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          document.getElementById("resultado").innerText = `✅ ${data.mensaje}`;
+        } else {
+          document.getElementById("resultado").innerText = `❌ Error: ${data.mensaje}`;
+        }
+      } catch (err) {
+        document.getElementById("resultado").innerText = `❌ Error en confirmación: ${err.message}`;
+      }
+    }
+
+    confirmarPago();
+  </script>
+</body>
+</html>
