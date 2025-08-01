@@ -8,7 +8,7 @@ exports.obtenerResumen = async (userId) => {
     throw new Error("Falta userId para obtener el resumen del carrito.");
   }
 
-  const res = await axios.get(`${CARRITO_SERVICE_URL}/resumen/${userId}`, {
+  const res = await axios.get(`${CARRITO_SERVICE_URL}/api/resumen/${userId}`, {
     headers: {
       'x-api-key': MICROSERVICIO_API_KEY
     }
@@ -22,7 +22,7 @@ exports.vaciarCarrito = async (userId) => {
     throw new Error("Falta userId para vaciar el carrito.");
   }
 
-  await axios.delete(`${CARRITO_SERVICE_URL}/vaciar/${userId}`, {
+  await axios.delete(`${CARRITO_SERVICE_URL}/api/vaciar/${userId}`, {
     headers: {
       'x-api-key': MICROSERVICIO_API_KEY
     }
