@@ -11,16 +11,23 @@ const VariacionSchema = new mongoose.Schema({
         trim: true,
     },
     color: {
-        type: String,
-        required: [true, 'El color es obligatorio'],
-        trim: true
+        nombre: {
+            type: String,
+            required: [true, 'El nombre del color es obligatorio'],
+            trim: true,
+        },
+        hex: {
+            type: String,
+            required: [true, 'El código hexadecimal del color es obligatorio'],
+            trim: true,
+            match: [/^#([0-9A-Fa-f]{6})$/, 'El formato del color debe ser hexadecimal (ej. #FF0000)']
+        }
     },
     stock: {
         type: Number,
         required: [true, 'El stock de la variación es obligatorio'],
         min: [0, 'El stock no puede ser negativo']
     },
-    // ✨ CAMBIO AQUÍ: Ahora 'imagenes' es un array de objetos
     imagenes: [
         {
             url: { type: String, trim: true },
@@ -29,11 +36,9 @@ const VariacionSchema = new mongoose.Schema({
     ],
     precio: {
         type: Number,
-        // ✨ Opcional: Si cada variación debe tener su propio precio
-        // required: [true, 'El precio de la variación es obligatorio'],
         min: [0, 'El precio de variación no puede ser negativo']
     }
-}, { _id: true }); // ✨ CAMBIO AQUÍ: Usamos '_id: true' para que cada variación tenga su propio ID único
+}, { _id: true }); // ✨ Cada variación tiene su propio ID único
 
 // 🛍️ Esquema principal del producto
 const ProductoSchema = new mongoose.Schema({
@@ -64,23 +69,23 @@ const ProductoSchema = new mongoose.Schema({
         trim: true
     },
     variaciones: {
-        type: [VariacionSchema], // Esto está perfecto, es un array de subdocumentos
+        type: [VariacionSchema],
         default: []
     },
     stock: {
         type: Number,
         min: [0, 'El stock no puede ser negativo'],
-        default: 0 // Cuando hay variaciones, este stock es 0 y el control se lleva en las variaciones
+        default: 0
     },
     disponible: {
         type: Boolean,
         default: true
     },
-    imagen: { // Esta es la imagen principal del producto
+    imagen: {
         type: String,
         trim: true
     },
-    public_id: { // El public_id de la imagen principal del producto
+    public_id: {
         type: String,
         trim: true
     },
