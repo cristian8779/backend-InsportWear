@@ -14,15 +14,24 @@ const PORT = process.env.PORT || 3007;
 conectarDB();
 
 // 🧱 Middlewares generales
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://127.0.0.1:5500',
+    'http://localhost:5500',
+    'https://api.soportee.store',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(morgan('dev'));
 app.use(express.json());
 
-// 📦 Rutas de pago (ej: POST /api/pagos/crear)
+// 📦 Rutas de pago
 app.use('/api/pagos', pagoRoutes);
 app.use('/api/firmas', firmaRoutes);
 
-// 🗂 Servir archivos estáticos (HTML, JS, etc.) desde la carpeta "public"
+// 🗂 Servir archivos estáticos desde la carpeta "public"
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ❌ Ruta no encontrada
