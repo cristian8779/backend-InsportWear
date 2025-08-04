@@ -37,37 +37,27 @@
         const { orderId, amount, currency, firma } = await res.json();
         console.log("✅ Firma generada:", { orderId, amount, currency, firma });
 
-        // Validación rápida
-        if (!orderId || !amount || !currency || !firma) {
-          throw new Error("❌ Datos incompletos para montar el botón de pago.");
-        }
-
-        // Paso 2: Cargar la librería de Bold
+        // Paso 2: Cargar el script de Bold manualmente
         const boldLib = document.createElement("script");
         boldLib.src = "https://checkout.bold.co/library/boldPaymentButton.js";
         boldLib.onload = () => {
           console.log("✅ Script de Bold cargado");
 
-          // Paso 3: Crear botón
-          const contenedor = document.getElementById("contenedorBoton");
-          if (!contenedor) {
-            console.error("❌ No se encontró el contenedor para el botón");
-            return;
-          }
+          // Paso 3: Crear el botón con los atributos
+          const btnScript = document.createElement("script");
+          btnScript.setAttribute("data-bold-button", "dark-L");
+          btnScript.setAttribute("data-api-key", "dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU");
+          btnScript.setAttribute("data-order-id", orderId);
+          btnScript.setAttribute("data-amount", amount);
+          btnScript.setAttribute("data-currency", currency);
+          btnScript.setAttribute("data-integrity-signature", firma);
 
-          const boldBtn = document.createElement("div");
-          boldBtn.setAttribute("data-bold-button", "dark-L");
-          boldBtn.setAttribute("data-api-key", "dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU");
-          boldBtn.setAttribute("data-order-id", String(orderId));
-          boldBtn.setAttribute("data-amount", String(amount));
-          boldBtn.setAttribute("data-currency", String(currency));
-          boldBtn.setAttribute("data-integrity-signature", String(firma));
+          // Paso 4: Insertar y montar
+          document.getElementById("contenedorBoton").appendChild(btnScript);
 
-          contenedor.appendChild(boldBtn);
-
-          // Paso 4: Montar botón manualmente
+          // Re-montar explícitamente
           if (window.BoldPaymentButton && typeof window.BoldPaymentButton.mount === "function") {
-            console.log("🔁 Montando botón de pago");
+            console.log("🔁 Re-montando botón");
             window.BoldPaymentButton.mount();
           } else {
             console.warn("⚠️ BoldPaymentButton.mount no está disponible");
