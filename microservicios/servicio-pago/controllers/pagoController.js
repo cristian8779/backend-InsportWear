@@ -9,16 +9,16 @@ exports.confirmarPago = async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan datos requeridos (orderId o userId)." });
     }
 
-    const estadoPago = await boldService.verificarPago(orderId);
-    if (estadoPago !== "APPROVED") {
+    const estado = await boldService.verificarPago(orderId);
+    if (estado !== "APPROVED") {
       return res.status(400).json({
         mensaje: "El pago aún no ha sido aprobado.",
-        estado: estadoPago.toLowerCase(),
+        estado: estado.toLowerCase(),
       });
     }
 
     const { productos, total } = await carritoService.obtenerResumen(userId);
-    if (!productos?.length) {
+    if (!Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({ mensaje: "Carrito vacío o no encontrado." });
     }
 
@@ -38,10 +38,11 @@ exports.confirmarPago = async (req, res) => {
       venta,
     });
   } catch (error) {
-    console.error("❌ Error en confirmarPago:", error?.response?.data || error.message);
+    const mensajeError = error?.response?.data?.mensaje || error.message || "Error desconocido";
+    console.error("❌ Error en confirmarPago:", mensajeError);
     res.status(500).json({
       mensaje: "Error al confirmar el pago.",
-      error: error?.response?.data || error.message,
+      error: mensajeError,
     });
   }
 };

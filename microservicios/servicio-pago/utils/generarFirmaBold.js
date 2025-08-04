@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
 module.exports = ({ orderId, amount, currency, secretKey }) => {
-  const data = `${orderId}${amount}${currency}`;
-  return crypto.createHmac("sha256", secretKey).update(data).digest("hex");
+  const data = `${orderId}${amount}${currency}${secretKey}`;
+  return crypto.createHash("sha256").update(data).digest("hex");
 };

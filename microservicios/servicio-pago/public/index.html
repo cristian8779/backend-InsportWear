@@ -1,78 +1,54 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pago con Bold</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagar con Bold (Botón Estático)</title>
 
-  <!-- ✅ SDK oficial de Bold -->
-  <script src="https://checkout.bold.co/sdk.js" defer></script>
+  <!-- Script del botón de pagos de Bold -->
+  <script src="https://checkout.bold.co/library/boldPaymentButton.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 100px;
+    }
+
+    h2 {
+      margin-bottom: 30px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Pagar con Bold</h1>
 
-  <!-- 🔴 Este botón será reemplazado por el estilo oficial de Bold -->
-  <button id="boldPayBtn"
-          style="display: none;"
-          data-api-key="dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU"
-          data-order-id=""
-          data-amount=""
-          data-currency="COP"
-          data-signature=""
-          data-redirect-url="">
-    Pagar con Bold
-  </button>
+  <h2>Realiza tu pago de forma segura</h2>
 
-  <script>
-    window.addEventListener('DOMContentLoaded', async () => {
-      const userId = "68673c075a27baac5d32268d";
-      const dominio = "https://api.soportee.store";
+  <!-- Botón de pagos Bold -->
+  <script
+    src="https://checkout.bold.co/library/boldPaymentButton.js"
+    data-bold-button="dark-L"
+    data-api-key="dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU
+"
+    data-order-id="ORD123456"
+    data-amount="25000"
+    data-currency="COP"
+    data-customer-data='{
+      "email": "cliente@correo.com",
+      "fullName": "Carlos Pérez",
+      "phone": "3011234567",
+      "dialCode": "+57",
+      "documentNumber": "123456789",
+      "documentType": "CC"
+    }'
+    data-billing-address='{
+      "address": "Calle 45 # 12-34",
+      "zipCode": "110111",
+      "city": "Bogotá",
+      "state": "Cundinamarca",
+      "country": "CO"
+    }'
+  ></script>
 
-      try {
-        const res = await fetch(`${dominio}/api/firmas/generar-firma`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error("Respuesta inválida del servidor: " + errorText);
-        }
-
-        const { orderId, amount, currency, firma } = await res.json();
-
-        const btn = document.getElementById("boldPayBtn");
-        btn.setAttribute("data-order-id", orderId);
-        btn.setAttribute("data-amount", amount);
-        btn.setAttribute("data-currency", currency);
-        btn.setAttribute("data-signature", firma);
-        btn.setAttribute("data-redirect-url", `${dominio}/confirmacion.html?orderId=${orderId}&userId=${userId}`);
-
-        // ✅ Mostrar el botón
-        btn.style.display = "inline-block";
-
-        // ✅ Espera que el SDK esté listo (window.BoldCheckout ya cargado)
-        const waitForSDK = () =>
-          new Promise((resolve) => {
-            const check = () => {
-              if (window.BoldCheckout && window.BoldCheckout.mount) {
-                resolve();
-              } else {
-                setTimeout(check, 100);
-              }
-            };
-            check();
-          });
-
-        await waitForSDK();
-        window.BoldCheckout.mount('#boldPayBtn');
-
-      } catch (err) {
-        console.error("❌ Error generando firma:", err);
-        alert("Error generando firma: " + err.message);
-      }
-    });
-  </script>
 </body>
 </html>
