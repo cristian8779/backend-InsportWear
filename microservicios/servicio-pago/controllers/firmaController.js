@@ -29,7 +29,7 @@ const generarFirma = async (req, res) => {
       });
     }
 
-    const amount = Math.round(Number(resumen.total)); // Por si viene con decimales
+    const amount = String(Math.round(Number(resumen.total)));
     const currency = "COP";
     const orderId = `orden-${Date.now()}`;
     const secretKey = process.env.BOLD_SECRET_KEY;
