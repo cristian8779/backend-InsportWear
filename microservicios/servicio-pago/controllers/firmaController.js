@@ -5,8 +5,8 @@ const generarFirma = async (req, res) => {
   try {
     const { userId } = req.body;
 
-    if (!userId) {
-      console.warn("⚠️ userId no proporcionado en el body");
+    if (!userId || typeof userId !== "string") {
+      console.warn("⚠️ userId no proporcionado o inválido en el body:", userId);
       return res.status(400).json({
         mensaje: "No pudimos identificar tu usuario. Intenta volver a iniciar sesión.",
       });
@@ -29,18 +29,34 @@ const generarFirma = async (req, res) => {
       });
     }
 
-    const amount = Number(resumen.total);
+    const amount = Math.round(Number(resumen.total)); // Por si viene con decimales
     const currency = "COP";
     const orderId = `orden-${Date.now()}`;
     const secretKey = process.env.BOLD_SECRET_KEY;
 
-    if (!secretKey) {
-      console.error("❌ Clave secreta BOLD no definida en variables de entorno.");
-      throw new Error("La configuración del sistema es incorrecta. Falta la clave secreta.");
+    if (!secretKey || typeof secretKey !== "string") {
+      console.error("❌ Clave secreta BOLD no definida o inválida.");
+      return res.status(500).json({
+        mensaje: "Falta la clave secreta de Bold en la configuración del servidor.",
+      });
     }
 
     console.log("🔐 Generando firma con:", { orderId, amount, currency });
-    const firma = generarFirmaBold({ orderId, amount, currency, secretKey });
+
+    const firma = generarFirmaBold({
+      orderId,
+      amount,
+      currency,
+      secretKey,
+    });
+
+    if (!firma || typeof firma !== "string") {
+      console.error("❌ Firma generada inválida:", firma);
+      return res.status(500).json({
+        mensaje: "No se pudo generar la firma de integridad correctamente.",
+      });
+    }
+
     console.log("✅ Firma generada:", firma);
 
     return res.status(200).json({
@@ -51,17 +67,16 @@ const generarFirma = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("❌ Error en generarFirma:", error);
+
     if (error.response) {
-      console.error("❌ Error HTTP al contactar microservicio:");
       console.error("📡 Status:", error.response.status);
       console.error("📝 Data:", error.response.data);
-    } else {
-      console.error("❌ Error interno al generar firma:", error.message);
     }
 
     return res.status(500).json({
       mensaje: "Ocurrió un error inesperado al intentar generar tu pago. Por favor intenta nuevamente en unos segundos.",
-      error: error?.response?.data || error.message,
+      error: error?.response?.data || error.message || "Error interno",
     });
   }
 };

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pagar con Bold</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -21,11 +22,11 @@
   <div id="contenedorBoton"></div>
 
   <script>
-    (async () => {
+    async function generarBotonBold() {
       try {
-        const userId = "68673c075a27baac5d32268d";
+        const userId = "6865f1558470d8e6d2ca6fde";
 
-        // Paso 1: Generar firma
+        // Solicitar firma desde tu backend
         const res = await fetch("https://api.soportee.store/api/firmas/generar-firma", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -37,40 +38,29 @@
         const { orderId, amount, currency, firma } = await res.json();
         console.log("✅ Firma generada:", { orderId, amount, currency, firma });
 
-        // Paso 2: Cargar el script de Bold manualmente
-        const boldLib = document.createElement("script");
-        boldLib.src = "https://checkout.bold.co/library/boldPaymentButton.js";
-        boldLib.onload = () => {
-          console.log("✅ Script de Bold cargado");
+        // Crear script del botón con src directamente
+        const botonScript = document.createElement("script");
+        botonScript.src = "https://checkout.bold.co/library/boldPaymentButton.js";
+        botonScript.setAttribute("data-bold-button", "dark-L");
+        botonScript.setAttribute("data-api-key", "dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU");
+        botonScript.setAttribute("data-order-id", orderId);
+        botonScript.setAttribute("data-amount", amount);
+        botonScript.setAttribute("data-currency", currency);
+        botonScript.setAttribute("data-integrity-signature", firma);
+        botonScript.setAttribute("type", "text/javascript");
 
-          // Paso 3: Crear el botón con los atributos
-          const btnScript = document.createElement("script");
-          btnScript.setAttribute("data-bold-button", "dark-L");
-          btnScript.setAttribute("data-api-key", "dcS3rZFaDw3dNa7nYM88pBsnL5Gz093pVirfSeafIBU");
-          btnScript.setAttribute("data-order-id", orderId);
-          btnScript.setAttribute("data-amount", amount);
-          btnScript.setAttribute("data-currency", currency);
-          btnScript.setAttribute("data-integrity-signature", firma);
+        document.getElementById("contenedorBoton").appendChild(botonScript);
 
-          // Paso 4: Insertar y montar
-          document.getElementById("contenedorBoton").appendChild(btnScript);
-
-          // Re-montar explícitamente
-          if (window.BoldPaymentButton && typeof window.BoldPaymentButton.mount === "function") {
-            console.log("🔁 Re-montando botón");
-            window.BoldPaymentButton.mount();
-          } else {
-            console.warn("⚠️ BoldPaymentButton.mount no está disponible");
-          }
-        };
-
-        document.head.appendChild(boldLib);
+        console.log("✅ Script del botón inyectado en el DOM");
 
       } catch (err) {
         console.error("❌ Error generando botón Bold:", err);
         alert("No pudimos cargar el botón de pago.");
       }
-    })();
+    }
+
+    // Llamar directamente la función (sin cargar dos veces el script de Bold)
+    generarBotonBold();
   </script>
 
 </body>
