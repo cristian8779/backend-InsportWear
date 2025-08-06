@@ -2,13 +2,11 @@ const axios = require("axios");
 const Anuncio = require("../models/Anuncio");
 const cloudinary = require("../config/cloudinary");
 
-// Rutas de servicios externos (por si los necesitás luego para validaciones)
-const PRODUCTO_SERVICE_URL = process.env.PRODUCTO_SERVICE_URL;
-const CATEGORIA_SERVICE_URL = process.env.CATEGORIA_SERVICE_URL;
-const USUARIO_SERVICE_URL = process.env.USUARIO_SERVICE_URL;
+// Servicios externos para obtener productos y categorías
+const { obtenerProductos, obtenerCategorias } = require("../utils/externalServices");
 
-// Obtener hasta 3 anuncios activos (por fecha)
-exports.obtenerActivos = async (req, res) => {
+// ✅ Obtener hasta 3 anuncios activos por fecha
+const obtenerActivos = async (req, res) => {
   try {
     const hoy = new Date();
     const activos = await Anuncio.find({
@@ -24,12 +22,12 @@ exports.obtenerActivos = async (req, res) => {
   }
 };
 
-// Crear un nuevo anuncio (solo admin o superAdmin)
-exports.crearAnuncio = async (req, res) => {
+// ✅ Crear un nuevo anuncio (requiere rol admin o superAdmin)
+const crearAnuncio = async (req, res) => {
   try {
     const { rol, id: usuarioId } = req.usuario;
 
-    if (!['admin', 'superAdmin'].includes(rol)) {
+    if (!["admin", "superAdmin"].includes(rol)) {
       return res.status(403).json({
         error: "No tienes permisos para crear anuncios.",
       });
@@ -37,14 +35,12 @@ exports.crearAnuncio = async (req, res) => {
 
     const { fechaInicio, fechaFin, productoId, categoriaId } = req.body;
 
-    // Validar que al menos se asocie un producto o una categoría
     if (!productoId && !categoriaId) {
       return res.status(400).json({
         error: "Debes asociar el anuncio a un producto o una categoría.",
       });
     }
 
-    // Validar fechas
     if (!fechaInicio || !fechaFin) {
       return res.status(400).json({
         error: "Debes especificar la fecha de inicio y la de finalización del anuncio.",
@@ -60,17 +56,16 @@ exports.crearAnuncio = async (req, res) => {
       });
     }
 
-    // Validar imagen (ya subida por multer + Cloudinary)
     if (!req.file || !req.file.path || !req.file.filename) {
       return res.status(400).json({
         error: "Debes subir una imagen válida para el anuncio.",
       });
     }
 
-    const imagenUrl = req.file.path;        // URL de Cloudinary
-    const publicId = req.file.filename;     // Public ID generado por Cloudinary
+    const imagenUrl = req.file.path;
+    const publicId = req.file.filename;
 
-    // Validar duplicado por producto o categoría en fechas cruzadas
+    // Validar si ya existe uno con fechas solapadas
     const filtroSolapado = {
       $or: [
         productoId ? { productoId } : null,
@@ -87,12 +82,10 @@ exports.crearAnuncio = async (req, res) => {
       });
     }
 
-    // Generar deeplink según el tipo
     let deeplink = "/";
     if (productoId) deeplink = `/producto/${productoId}`;
     else if (categoriaId) deeplink = `/categoria/${categoriaId}`;
 
-    // Crear y guardar el anuncio
     const anuncio = new Anuncio({
       imagen: imagenUrl,
       publicId,
@@ -105,7 +98,6 @@ exports.crearAnuncio = async (req, res) => {
     });
 
     await anuncio.save();
-
     res.status(201).json(anuncio);
 
   } catch (error) {
@@ -116,35 +108,35 @@ exports.crearAnuncio = async (req, res) => {
   }
 };
 
-// Eliminar anuncio por ID y borrar imagen de Cloudinary
-exports.eliminarAnuncio = async (req, res) => {
+// ✅ Eliminar anuncio
+const eliminarAnuncio = async (req, res) => {
   try {
     const { rol } = req.usuario;
 
-    if (!['admin', 'superAdmin'].includes(rol)) {
-      return res.status(403).json({ error: "No tienes permisos para eliminar anuncios." });
+    if (!["admin", "superAdmin"].includes(rol)) {
+      return res.status(403).json({
+        error: "No tienes permisos para eliminar anuncios.",
+      });
     }
 
     const anuncio = await Anuncio.findById(req.params.id);
-
     if (!anuncio) {
-      return res.status(404).json({ error: "No se encontró el anuncio solicitado." });
+      return res.status(404).json({
+        error: "No se encontró el anuncio solicitado.",
+      });
     }
 
-    // Eliminar imagen de Cloudinary si existe
     if (anuncio.publicId) {
       try {
         await cloudinary.uploader.destroy(anuncio.publicId, {
-          resource_type: 'image'
+          resource_type: 'image',
         });
       } catch (error) {
         console.warn("⚠️ No se pudo eliminar la imagen de Cloudinary:", error);
-        // Se continúa con la eliminación del anuncio aunque la imagen falle
       }
     }
 
     await Anuncio.findByIdAndDelete(req.params.id);
-
     res.json({ mensaje: "El anuncio fue eliminado correctamente." });
 
   } catch (error) {
@@ -153,4 +145,38 @@ exports.eliminarAnuncio = async (req, res) => {
       error: "No se pudo eliminar el anuncio. Intenta nuevamente más tarde.",
     });
   }
+};
+
+// ✅ Obtener productos desde microservicio
+const obtenerProductosDesdeServicio = async (req, res) => {
+  try {
+    const productos = await obtenerProductos();
+    res.json({ productos });
+  } catch (error) {
+    console.error("❌ Error al obtener productos:", error);
+    res.status(500).json({
+      error: "No se pudieron obtener los productos.",
+    });
+  }
+};
+
+// ✅ Obtener categorías desde microservicio
+const obtenerCategoriasDesdeServicio = async (req, res) => {
+  try {
+    const categorias = await obtenerCategorias();
+    res.json({ categorias });
+  } catch (error) {
+    console.error("❌ Error al obtener categorías:", error);
+    res.status(500).json({
+      error: "No se pudieron obtener las categorías.",
+    });
+  }
+};
+
+module.exports = {
+  obtenerActivos,
+  crearAnuncio,
+  eliminarAnuncio,
+  obtenerProductos: obtenerProductosDesdeServicio,
+  obtenerCategorias: obtenerCategoriasDesdeServicio,
 };
