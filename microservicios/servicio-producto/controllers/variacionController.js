@@ -150,13 +150,13 @@ const agregarVariacion = async (req, res) => {
 
         // Creación de la nueva variación
         const nuevaVariacion = {
-            tallaLetra,
-            stock, // Ya es un número
-            precio, // Ya es un número
-            color,
-            imagenes,
-        };
-
+                _id: req.body._id || new mongoose.Types.ObjectId(), // 👈 ESTA LÍNEA ES LA CLAVE
+                tallaLetra,
+                stock,
+                precio,
+                color,
+                imagenes,
+};
         producto.variaciones.push(nuevaVariacion);
         await producto.save();
 

@@ -126,5 +126,7 @@ console.log('Ruta DELETE /:productoId/variaciones/:id: Configurada para eliminar
 router.put('/:productoId/variaciones/:id/reducir-stock', reducirStockVariacion);
 console.log('Ruta PUT /:productoId/variaciones/:id/reducir-stock: Configurada para reducir stock de una variación específica (Ideal para microservicios/carrito).');
 
+// Nueva ruta para agregar una variación a un producto
+
 
 module.exports = router;
