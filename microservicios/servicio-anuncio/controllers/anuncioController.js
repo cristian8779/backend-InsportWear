@@ -1,6 +1,7 @@
 const axios = require("axios");
 const Anuncio = require("../models/Anuncio");
 const cloudinary = require("../config/cloudinary");
+const moment = require("moment-timezone");  // <-- Importa moment-timezone
 
 // Servicios externos para obtener productos y categorías
 const { obtenerProductos, obtenerCategorias } = require("../utils/externalServices");
@@ -8,7 +9,7 @@ const { obtenerProductos, obtenerCategorias } = require("../utils/externalServic
 // ✅ Obtener hasta 5 anuncios activos por fecha
 const obtenerActivos = async (req, res) => {
   try {
-    const hoy = new Date();
+    const hoy = moment().tz("America/Bogota").startOf('day').toDate();
     const activos = await Anuncio.find({
       fechaInicio: { $lte: hoy },
       fechaFin: { $gte: hoy },
@@ -47,8 +48,9 @@ const crearAnuncio = async (req, res) => {
       });
     }
 
-    const fechaInicioDate = new Date(fechaInicio);
-    const fechaFinDate = new Date(fechaFin);
+    // Convierte las fechas a zona horaria Colombia
+    const fechaInicioDate = moment.tz(fechaInicio, "America/Bogota").startOf('day').toDate();
+    const fechaFinDate = moment.tz(fechaFin, "America/Bogota").endOf('day').toDate();
 
     if (fechaFinDate < fechaInicioDate) {
       return res.status(400).json({
