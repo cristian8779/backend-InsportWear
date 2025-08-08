@@ -1,4 +1,3 @@
-// jobs/limpiarAnunciosVencidos.js
 const cron = require('node-cron');
 const Anuncio = require('../models/Anuncio');
 const cloudinary = require('../config/cloudinary');
@@ -9,12 +8,12 @@ cron.schedule('0 0 * * *', async () => {
 
   try {
     const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
 
     // Buscar anuncios vencidos
     const vencidos = await Anuncio.find({ fechaFin: { $lt: hoy } });
 
-    for (const anuncio of vencidos) {
-      // Si el anuncio tiene un publicId (imagen en Cloudinary), la eliminamos
+    await Promise.all(vencidos.map(async (anuncio) => {
       if (anuncio.publicId) {
         try {
           await cloudinary.uploader.destroy(anuncio.publicId);
@@ -23,11 +22,9 @@ cron.schedule('0 0 * * *', async () => {
           console.warn(`⚠️ Error eliminando imagen Cloudinary (${anuncio.publicId}):`, err.message);
         }
       }
-
-      // Eliminar anuncio de la base de datos
       await anuncio.deleteOne();
       console.log(`✅ Anuncio eliminado: ${anuncio._id}`);
-    }
+    }));
 
     console.log(`📦 Limpieza completada. Total eliminados: ${vencidos.length}`);
 

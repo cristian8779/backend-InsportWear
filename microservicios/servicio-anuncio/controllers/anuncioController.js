@@ -5,14 +5,14 @@ const cloudinary = require("../config/cloudinary");
 // Servicios externos para obtener productos y categorías
 const { obtenerProductos, obtenerCategorias } = require("../utils/externalServices");
 
-// ✅ Obtener hasta 3 anuncios activos por fecha
+// ✅ Obtener hasta 5 anuncios activos por fecha
 const obtenerActivos = async (req, res) => {
   try {
     const hoy = new Date();
     const activos = await Anuncio.find({
       fechaInicio: { $lte: hoy },
       fechaFin: { $gte: hoy },
-    }).limit(3);
+    }).limit(5);
     res.json(activos);
   } catch (error) {
     console.error("❌ Error al obtener anuncios:", error);
