@@ -86,7 +86,7 @@ const registrar = async (req, res) => {
     const accessToken = jwt.sign(
       { id: usuarioCreado._id, rol: nuevaCredencial.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "7d" }
     );
 
     const refreshToken = jwt.sign(
@@ -155,7 +155,7 @@ const login = async (req, res) => {
     const accessToken = jwt.sign(
       { id: usuario._id, rol: credencial.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "7d" }
     );
 
     const refreshToken = jwt.sign(
@@ -206,7 +206,7 @@ const renovarToken = async (req, res) => {
     const nuevoAccessToken = jwt.sign(
       { id: decoded.id, rol: decoded.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "7d" }
     );
 
     res.json({
