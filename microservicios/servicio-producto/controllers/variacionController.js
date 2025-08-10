@@ -1,9 +1,7 @@
 const Producto = require('../models/Producto');
 const cloudinary = require('../config/cloudinary');
 const mongoose = require('mongoose');
-
 const crypto = require('crypto');
-const fs = require('fs');
 
 /* -------------------- Helpers -------------------- */
 
@@ -32,54 +30,21 @@ function generateUniqueHash(file) {
     }
 }
 
-// hash MD5 del archivo (para archivos locales - mantenido para compatibilidad)
-function getFileHash(filePath) {
-    try {
-        console.log(`🔍 Calculando hash para: ${filePath}`);
-        
-        if (!filePath || filePath.startsWith("http")) {
-            console.log(`⚠️ Es una URL, no un archivo local: ${filePath}`);
-            return null; // no hay hash para URLs
-        }
-        
-        if (!fs.existsSync(filePath)) {
-            console.log(`❌ Archivo no existe: ${filePath}`);
-            return null; // evita ENOENT
-        }
-        
-        const stats = fs.statSync(filePath);
-        console.log(`📊 Archivo encontrado - Tamaño: ${stats.size} bytes`);
-        
-        if (stats.size === 0) {
-            console.log(`⚠️ Archivo vacío: ${filePath}`);
-            return null;
-        }
-        
-        const fileBuffer = fs.readFileSync(filePath);
-        console.log(`📖 Buffer leído - Tamaño: ${fileBuffer.length} bytes`);
-        
-        const hashSum = crypto.createHash('md5');
-        hashSum.update(fileBuffer);
-        const hash = hashSum.digest('hex');
-        
-        console.log(`✅ Hash calculado: ${hash}`);
-        return hash;
-        
-    } catch (error) {
-        console.error(`❌ Error calculando hash para ${filePath}:`, error.message);
-        return null;
-    }
-}
-
 // determina si una variación "usa" un hash o public_id dado
 function variationUsesHash(variacion, hash, public_id) {
     if (!variacion) return false;
     if (hash) {
-        // Solo verificamos hashImagen (una sola imagen)
         if (variacion.hashImagen === hash) return true;
     }
-    if (public_id && variacion.imagen && variacion.imagen.public_id === public_id) {
-        return true;
+    if (public_id) {
+        // Buscar en imagen singular
+        if (variacion.imagen && variacion.imagen.public_id === public_id) {
+            return true;
+        }
+        // Buscar en imagenes array
+        if (variacion.imagenes && Array.isArray(variacion.imagenes)) {
+            return variacion.imagenes.some(img => img && img.public_id === public_id);
+        }
     }
     return false;
 }
@@ -96,9 +61,6 @@ function countImageUsage(producto, hash = null, public_id = null, excludeVariaci
 
 /**
  * Borra de Cloudinary *solo* las imágenes que no estén siendo usadas por otras variaciones del producto.
- * - producto: documento completo del producto (con variaciones)
- * - imagen: objeto { url, public_id } (una sola imagen)
- * - excludeVariacionId: id de la variación que se está modificando/eliminando (para no contarse a sí misma)
  */
 async function safeDeleteImage(producto, imagen = null, excludeVariacionId = null) {
     if (!imagen || !imagen.public_id) return;
@@ -117,13 +79,36 @@ async function safeDeleteImage(producto, imagen = null, excludeVariacionId = nul
 }
 
 /**
- * Procesa UNA SOLA imagen que ya fue subida a Cloudinary:
- * - Genera un hash único basado en las características del archivo
- * - Si una imagen con el mismo hash ya existe en alguna variación del producto -> reutiliza esa imagen
- * - Si no existe -> usa la imagen ya subida a Cloudinary
- * Devuelve: { imagen: {url, public_id}, hashImagen: hash }
+ * 🚀 NUEVA FUNCIÓN: Elimina todas las imágenes de una variación (tanto singular como array)
  */
-async function safeProcessCloudinaryFile(files = [], producto) {
+async function safeDeleteVariacionImages(producto, variacion, excludeVariacionId = null) {
+    if (!variacion) return;
+    
+    console.log(`🧹 Limpiando imágenes de variación ${variacion._id}...`);
+    
+    // Eliminar imagen singular si existe
+    if (variacion.imagen) {
+        await safeDeleteImage(producto, variacion.imagen, excludeVariacionId);
+    }
+    
+    // Eliminar imágenes del array si existen
+    if (variacion.imagenes && Array.isArray(variacion.imagenes)) {
+        for (const imagen of variacion.imagenes) {
+            if (imagen && imagen.public_id) {
+                await safeDeleteImage(producto, imagen, excludeVariacionId);
+            }
+        }
+    }
+    
+    console.log(`✅ Limpieza de imágenes completada para variación ${variacion._id}`);
+}
+
+/**
+ * 🚀 FUNCIÓN MEJORADA: Procesa archivos ya subidos a Cloudinary con mejor manejo de errores
+ */
+async function safeProcessCloudinaryFiles(files = [], producto) {
+    const uploadedFiles = []; // Track para limpieza en caso de error
+    
     try {
         console.log(`🔍 Procesando archivos de Cloudinary: ${files.length} archivos recibidos`);
         
@@ -134,17 +119,18 @@ async function safeProcessCloudinaryFile(files = [], producto) {
 
         // ✅ SOLO tomamos el primer archivo (UNA imagen por variación)
         const file = files[0];
+        uploadedFiles.push(file); // Track para limpieza
+        
         console.log(`📁 Procesando archivo de Cloudinary: ${JSON.stringify({
             fieldname: file.fieldname,
             originalname: file.originalname,
-            encoding: file.encoding,
             mimetype: file.mimetype,
             filename: file.filename,
             path: file.path,
             size: file.size
         }, null, 2)}`);
         
-        // Validar que el archivo tenga las propiedades necesarias
+        // Validar que el archivo sea de Cloudinary
         if (!file.path || !file.path.startsWith('https://res.cloudinary.com')) {
             throw new Error("El archivo no es una URL válida de Cloudinary");
         }
@@ -153,56 +139,56 @@ async function safeProcessCloudinaryFile(files = [], producto) {
             throw new Error(`Tipo de archivo no válido: ${file.mimetype}. Solo se permiten imágenes.`);
         }
         
-        // Eliminar archivos adicionales de Cloudinary si los hay
+        // 🧹 Eliminar archivos adicionales inmediatamente
         if (files.length > 1) {
             console.log(`⚠️ Se enviaron ${files.length} archivos, eliminando archivos adicionales de Cloudinary...`);
             for (let i = 1; i < files.length; i++) {
                 try {
                     if (files[i].filename) {
                         await cloudinary.uploader.destroy(files[i].filename);
-                        console.log(`🧹 Archivo adicional eliminado de Cloudinary: ${files[i].filename}`);
+                        console.log(`🧹 Archivo adicional eliminado: ${files[i].filename}`);
                     }
                 } catch (e) {
-                    console.error(`⚠️ Error al eliminar archivo adicional de Cloudinary: ${e.message}`);
+                    console.error(`⚠️ Error al eliminar archivo adicional: ${e.message}`);
                 }
             }
         }
 
-        // Generar hash único para el archivo
+        // Generar hash único
         const fileHash = generateUniqueHash(file);
-
         if (!fileHash) {
-            throw new Error("No se pudo generar el hash único de la imagen. Verifica que el archivo sea válido.");
+            throw new Error("No se pudo generar el hash único de la imagen.");
         }
 
-        console.log(`🔍 Buscando variación existente con hash: ${fileHash}`);
-
-        // Buscar si ya existe una variación con este hash
+        // Buscar duplicados
         const variacionDuplicada = producto.variaciones.find(v => {
             return v && v.hashImagen === fileHash;
         });
 
-        if (variacionDuplicada && variacionDuplicada.imagen) {
-            console.log(`♻️ Imagen duplicada encontrada - Eliminando de Cloudinary: ${file.filename}`);
-            console.log(`📷 Reutilizando imagen existente: ${variacionDuplicada.imagen.url}`);
+        if (variacionDuplicada) {
+            // Buscar imagen existente (puede estar en 'imagen' o 'imagenes[0]')
+            let imagenExistente = null;
             
-            // Eliminar el archivo duplicado de Cloudinary
-            try {
-                await cloudinary.uploader.destroy(file.filename);
-                console.log(`🗑️ Imagen duplicada eliminada de Cloudinary: ${file.filename}`);
-            } catch (e) {
-                console.error(`⚠️ Error al eliminar imagen duplicada: ${e.message}`);
+            if (variacionDuplicada.imagen) {
+                imagenExistente = variacionDuplicada.imagen;
+            } else if (variacionDuplicada.imagenes && variacionDuplicada.imagenes.length > 0) {
+                imagenExistente = variacionDuplicada.imagenes[0];
             }
             
-            // Reutilizamos la imagen existente
-            return {
-                imagen: variacionDuplicada.imagen,
-                hashImagen: fileHash
-            };
+            if (imagenExistente) {
+                console.log(`♻️ Imagen duplicada encontrada - Eliminando de Cloudinary: ${file.filename}`);
+                console.log(`📷 Reutilizando imagen existente: ${imagenExistente.url}`);
+                
+                // Eliminar duplicado
+                await cloudinary.uploader.destroy(file.filename);
+                
+                return {
+                    imagen: imagenExistente,
+                    hashImagen: fileHash
+                };
+            }
         } else {
-            // Usar la imagen ya subida a Cloudinary
-            console.log(`📤 Usando nueva imagen subida a Cloudinary: ${file.path}`);
-            
+            console.log(`📤 Usando nueva imagen: ${file.path}`);
             return {
                 imagen: { 
                     url: file.path, 
@@ -213,22 +199,41 @@ async function safeProcessCloudinaryFile(files = [], producto) {
         }
 
     } catch (err) {
-        console.error(`❌ Error en safeProcessCloudinaryFile:`, err.message);
+        console.error(`❌ Error en safeProcessCloudinaryFiles:`, err.message);
         
-        // Limpiar archivos de Cloudinary en caso de error
-        if (files && files.length > 0) {
-            for (const file of files) {
-                try { 
-                    if (file.filename) {
-                        await cloudinary.uploader.destroy(file.filename);
-                        console.log(`🧹 Archivo eliminado de Cloudinary tras error: ${file.filename}`);
-                    }
-                } catch (_) {
-                    console.error(`⚠️ No se pudo eliminar archivo de Cloudinary: ${file.filename}`);
+        // 🧹 Limpiar TODOS los archivos subidos en caso de error
+        console.log(`🧹 Limpiando ${uploadedFiles.length} archivos de Cloudinary debido a error...`);
+        for (const file of uploadedFiles) {
+            try { 
+                if (file.filename) {
+                    await cloudinary.uploader.destroy(file.filename);
+                    console.log(`🧹 Archivo eliminado: ${file.filename}`);
                 }
+            } catch (_) {
+                console.error(`⚠️ No se pudo eliminar: ${file.filename}`);
             }
         }
+        
         throw new Error(`Error procesando imagen: ${err.message}`);
+    }
+}
+
+/**
+ * 🚀 NUEVA FUNCIÓN: Limpia archivos de Cloudinary por public_id
+ */
+async function cleanupCloudinaryFiles(files) {
+    if (!files || !Array.isArray(files)) return;
+    
+    console.log(`🧹 Limpiando ${files.length} archivos de Cloudinary...`);
+    for (const file of files) {
+        try {
+            if (file.filename) {
+                await cloudinary.uploader.destroy(file.filename);
+                console.log(`🧹 Archivo eliminado de Cloudinary: ${file.filename}`);
+            }
+        } catch (err) {
+            console.error(`⚠️ Error al eliminar archivo: ${file.filename}`, err.message);
+        }
     }
 }
 
@@ -259,49 +264,51 @@ const extraerColor = (body) => {
     return null;
 };
 
-// ✅ Agregar variación (optimizado para UNA imagen sin duplicados)
 const agregarVariacion = async (req, res) => {
+    // 🔥 VALIDACIÓN INMEDIATA: Si hay errores, limpiamos Cloudinary de inmediato
     try {
         let { tallaLetra, tallaNumero, stock, precio } = req.body;
         stock = Number(stock);
         precio = Number(precio);
-
         const color = extraerColor(req.body);
+
+        // ❌ Validaciones con limpieza inmediata de Cloudinary
         if (!tallaLetra && !tallaNumero) {
-            return res.status(400).json({ mensaje: '🚫 Debes proporcionar al menos una talla: "tallaLetra" o "tallaNumero".' });
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ 
+                mensaje: '🚫 ¡Ojo! Necesitamos al menos una talla: "tallaLetra" o "tallaNumero".' 
+            });
         }
+        
         if (isNaN(stock) || stock < 0) {
-            return res.status(400).json({ mensaje: '🚫 Campo "stock" obligatorio y debe ser número no negativo.' });
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ 
+                mensaje: '🚫 El campo "stock" debe ser un número válido y no negativo.' 
+            });
         }
+        
         if (isNaN(precio) || precio < 0) {
-            return res.status(400).json({ mensaje: '🚫 Campo "precio" obligatorio y debe ser número no negativo.' });
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ 
+                mensaje: '🚫 El campo "precio" debe ser un número válido y no negativo.' 
+            });
         }
+        
         if (!color) {
-            return res.status(400).json({ mensaje: '🚫 El campo "color" es obligatorio y debe tener "hex" y "nombre".' });
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ 
+                mensaje: '🚫 El campo "color" es obligatorio. Por favor, ingresa el color de la variación.' 
+            });
         }
 
+        // Buscar producto
         const producto = await Producto.findById(req.params.productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
-
-        let imagen = null;
-        let hashImagen = null;
-
-        // ✅ Validar que solo se suba UNA imagen
-        if (req.files && req.files.length > 0) {
-            if (req.files.length > 1) {
-                console.log(`⚠️ Se enviaron ${req.files.length} archivos, pero solo se procesará 1.`);
-            }
-            
-            try {
-                const uploadResult = await safeProcessCloudinaryFile(req.files, producto);
-                imagen = uploadResult.imagen;
-                hashImagen = uploadResult.hashImagen;
-            } catch (err) {
-                console.error("⚠️ Error al procesar imagen en agregarVariacion:", err.message);
-                return res.status(500).json({ mensaje: '❌ Error al procesar imagen. No se ha guardado la variación.', error: err.message });
-            }
+        if (!producto) {
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(404).json({ mensaje: '🚫 No encontramos el producto solicitado.' });
         }
 
+        // ✅ Crear variación base (sin imagen)
         const nuevaVariacion = {
             _id: req.body._id || new mongoose.Types.ObjectId(),
             tallaLetra: tallaLetra || undefined,
@@ -309,17 +316,49 @@ const agregarVariacion = async (req, res) => {
             stock,
             precio,
             color,
-            imagen: imagen || undefined,
-            hashImagen: hashImagen || undefined
         };
 
+        // 🖼️ Procesar imagen (ya está en Cloudinary)
+        if (req.files && req.files.length > 0) {
+            try {
+                const uploadResult = await safeProcessCloudinaryFiles(req.files, producto);
+                
+                if (uploadResult.imagen) {
+                    // Guardar como array de imágenes para compatibilidad con el esquema
+                    nuevaVariacion.imagenes = [uploadResult.imagen];
+                    nuevaVariacion.imagen = uploadResult.imagen; // Mantener referencia singular también
+                    nuevaVariacion.hashImagen = uploadResult.hashImagen;
+                }
+                
+            } catch (err) {
+                console.error("⚠️ Error al procesar imagen:", err.message);
+                // Los archivos ya fueron limpiados en safeProcessCloudinaryFiles
+                return res.status(500).json({ 
+                    mensaje: '❌ Hubo un problema al procesar la imagen. Variación no guardada.', 
+                    error: err.message 
+                });
+            }
+        }
+
+        // ✅ Guardar variación
         producto.variaciones.push(nuevaVariacion);
         await producto.save();
 
-        res.status(201).json({ mensaje: '✅ Variación agregada con éxito.', producto });
+        res.status(201).json({ 
+            mensaje: '✅ ¡Todo listo! Variación agregada exitosamente.', 
+            producto 
+        });
+
     } catch (error) {
         console.error("🐛 Error al agregar variación:", error.message, error.stack);
-        res.status(500).json({ mensaje: '❌ Error interno al agregar variación.', error: error.message });
+        
+        // 🧹 Limpieza final en caso de error inesperado
+        await cleanupCloudinaryFiles(req.files);
+        
+        res.status(500).json({ 
+            mensaje: '❌ ¡Ups! Algo salió mal al agregar la variación.', 
+            error: error.message 
+        });
     }
 };
 
@@ -327,142 +366,180 @@ const agregarVariacion = async (req, res) => {
 const obtenerVariaciones = async (req, res) => {
     try {
         const producto = await Producto.findById(req.params.productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
-        res.status(200).json({ variaciones: producto.variaciones });
+
+        if (!producto) {
+            return res.status(404).json({ mensaje: '🚫 No encontramos el producto solicitado.' });
+        }
+
+        res.status(200).json({ mensaje: '✅ Variaciones obtenidas con éxito.', variaciones: producto.variaciones });
     } catch (error) {
         console.error("🐛 Error al obtener variaciones:", error.message, error.stack);
-        res.status(500).json({ mensaje: '❌ Error al obtener variaciones', error: error.message });
+        res.status(500).json({ mensaje: '❌ Hubo un problema interno.', error: error.message });
     }
 };
 
-// ✅ Actualizar variación (optimizado para UNA imagen sin duplicados)
+// ✅ Actualizar variación
 const actualizarVariacion = async (req, res) => {
     try {
-        const { productoId, id: variacionId } = req.params;
+        const { productoId, variacionId } = req.params;
         const producto = await Producto.findById(productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
 
-        const variacion = producto.variaciones.id(variacionId);
-        if (!variacion) return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
-
-        let { tallaLetra, tallaNumero, stock, precio } = req.body;
-        if (!tallaLetra && !tallaNumero && (variacion.tallaLetra === undefined && variacion.tallaNumero === undefined)) {
-            return res.status(400).json({ mensaje: '🚫 Debes proporcionar al menos una talla: "tallaLetra" o "tallaNumero".' });
+        if (!producto) {
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(404).json({ mensaje: '🚫 No encontramos el producto.' });
         }
 
-        if (stock !== undefined) stock = Number(stock);
-        if (precio !== undefined) precio = Number(precio);
+        const variacion = producto.variaciones.id(variacionId);
+        if (!variacion) {
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
+        }
+
+        let { tallaLetra, tallaNumero, stock, precio } = req.body;
+
+        // Validaciones tempranas con limpieza
+        if (!tallaLetra && !tallaNumero && (variacion.tallaLetra === undefined && variacion.tallaNumero === undefined)) {
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ mensaje: '🚫 Debes proporcionar al menos una talla.' });
+        }
+
+        if (stock !== undefined) {
+            stock = Number(stock);
+            if (isNaN(stock) || stock < 0) {
+                await cleanupCloudinaryFiles(req.files);
+                return res.status(400).json({ mensaje: '🚫 El stock debe ser un número positivo.' });
+            }
+        }
+        
+        if (precio !== undefined) {
+            precio = Number(precio);
+            if (isNaN(precio) || precio < 0) {
+                await cleanupCloudinaryFiles(req.files);
+                return res.status(400).json({ mensaje: '🚫 El precio debe ser un número positivo.' });
+            }
+        }
 
         const color = extraerColor(req.body);
 
+        // Actualizar campos básicos
         if (tallaLetra !== undefined) variacion.tallaLetra = tallaLetra;
         if (tallaNumero !== undefined) variacion.tallaNumero = tallaNumero;
-        if (stock !== undefined) {
-            if (isNaN(stock) || stock < 0) return res.status(400).json({ mensaje: '🚫 stock inválido.' });
-            variacion.stock = stock;
-        }
-        if (precio !== undefined) {
-            if (isNaN(precio) || precio < 0) return res.status(400).json({ mensaje: '🚫 precio inválido.' });
-            variacion.precio = precio;
-        }
+        if (stock !== undefined) variacion.stock = stock;
+        if (precio !== undefined) variacion.precio = precio;
         if (color) variacion.color = color;
 
-        // Manejo de UNA imagen en la actualización
+        // Procesar imagen si hay archivos
         if (req.files && req.files.length > 0) {
-            if (req.files.length > 1) {
-                console.log(`⚠️ Se enviaron ${req.files.length} archivos, pero solo se procesará 1.`);
-            }
-
-            let uploadResult;
             try {
-                uploadResult = await safeProcessCloudinaryFile(req.files, producto);
-            } catch (err) {
-                console.error("⚠️ Error al procesar imagen en actualizarVariacion:", err.message);
-                return res.status(500).json({ mensaje: '❌ Error al procesar nueva imagen. No se guardaron cambios de imagen.', error: err.message });
-            }
+                const uploadResult = await safeProcessCloudinaryFiles(req.files, producto);
+                const newHash = uploadResult.hashImagen;
+                const oldHash = variacion.hashImagen;
 
-            const newHash = uploadResult.hashImagen;
-            const oldHash = variacion.hashImagen;
+                if (newHash && newHash !== oldHash) {
+                    console.log(`🔄 Actualizando imagen: ${oldHash} -> ${newHash}`);
 
-            // Solo actualizar si el hash es diferente
-            if (newHash && newHash !== oldHash) {
-                console.log(`🔄 Actualizando imagen: ${oldHash} -> ${newHash}`);
-                
-                // Eliminar imagen anterior si ya no se usa
-                if (variacion.imagen) {
-                    await safeDeleteImage(producto, variacion.imagen, variacion._id);
+                    // 🧹 Eliminar TODAS las imágenes anteriores de la variación
+                    await safeDeleteVariacionImages(producto, variacion, variacion._id);
+
+                    // Actualizar tanto el campo singular como el array
+                    variacion.imagen = uploadResult.imagen;
+                    variacion.imagenes = [uploadResult.imagen];
+                    variacion.hashImagen = newHash;
+                } else if (newHash === oldHash) {
+                    console.log("ℹ️ Imagen igual, no se cambia.");
                 }
-
-                // Asignar nueva imagen y hash
-                variacion.imagen = uploadResult.imagen;
-                variacion.hashImagen = newHash;
-            } else if (newHash === oldHash) {
-                console.log("ℹ️ La nueva imagen es idéntica a la anterior (mismo hash). No se reemplaza.");
+                
+            } catch (err) {
+                console.error("⚠️ Error al procesar imagen:", err.message);
+                return res.status(500).json({ 
+                    mensaje: '❌ Problema al procesar imagen.', 
+                    error: err.message 
+                });
             }
         }
 
         await producto.save();
-        res.status(200).json({ mensaje: '✅ Variación actualizada con éxito.', producto });
+
+        res.status(200).json({ 
+            mensaje: '✅ Variación actualizada con éxito.', 
+            producto 
+        });
+        
     } catch (error) {
-        console.error("🐛 Error al actualizar variación:", error.message, error.stack);
-        res.status(500).json({ mensaje: '❌ Error interno al actualizar variación.', error: error.message });
+        console.error("🐛 Error al actualizar variación:", error.message);
+        await cleanupCloudinaryFiles(req.files);
+        res.status(500).json({ 
+            mensaje: '❌ Problema interno al actualizar.', 
+            error: error.message 
+        });
     }
 };
 
-// ✅ Eliminar variación (sin borrar imagen si es usada por otras variaciones)
+// ✅ Eliminar variación con limpieza completa de imágenes
 const eliminarVariacion = async (req, res) => {
     try {
         const { productoId, id: variacionId } = req.params;
 
         const producto = await Producto.findById(productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
+        if (!producto) return res.status(404).json({ mensaje: '🚫 No encontramos el producto.' });
 
         const variacion = producto.variaciones.id(variacionId);
         if (!variacion) return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
 
-        // Borrar imagen solo si ninguna otra variación la usa
-        if (variacion.imagen) {
-            await safeDeleteImage(producto, variacion.imagen, variacion._id);
-        }
+        console.log(`🗑️ Eliminando variación ${variacionId} y sus imágenes...`);
 
-        // Eliminar la variación del subdocumento
+        // 🧹 Eliminar TODAS las imágenes de la variación (singular y array)
+        await safeDeleteVariacionImages(producto, variacion, variacion._id);
+
+        // Eliminar la variación del producto
         variacion.deleteOne();
         await producto.save();
 
-        res.status(200).json({ mensaje: '✅ Variación eliminada con éxito.', producto });
+        console.log(`✅ Variación ${variacionId} eliminada exitosamente`);
+
+        res.status(200).json({ mensaje: '✅ Variación eliminada exitosamente.', producto });
+
     } catch (error) {
-        console.error("🐛 Error al eliminar variación:", error.message, error.stack);
-        res.status(500).json({ mensaje: '❌ Error interno al eliminar variación.', error: error.message });
+        console.error("🐛 Error al eliminar variación:", error.message);
+        res.status(500).json({ mensaje: '❌ Error al eliminar variación.', error: error.message });
     }
 };
 
-// ✅ Reducir stock de una variación (sin cambios)
+// ✅ Reducir stock
 const reducirStockVariacion = async (req, res) => {
     try {
         const { productoId, variacionId } = req.params;
         const { cantidad } = req.body;
 
         const numericCantidad = Number(cantidad);
+        
         if (isNaN(numericCantidad) || numericCantidad <= 0) {
             return res.status(400).json({ mensaje: '🚫 La cantidad debe ser un número positivo.' });
         }
 
         const producto = await Producto.findById(productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
+        if (!producto) {
+            return res.status(404).json({ mensaje: '🚫 No encontramos el producto.' });
+        }
 
         const variacion = producto.variaciones.id(variacionId);
-        if (!variacion) return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
+        if (!variacion) {
+            return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
+        }
 
         if (Number(variacion.stock) < numericCantidad) {
-            return res.status(400).json({ mensaje: '🚫 Stock insuficiente.', stockDisponible: variacion.stock });
+            return res.status(400).json({ mensaje: '🚫 No hay suficiente stock. Disponible: ' + variacion.stock });
         }
 
         variacion.stock -= numericCantidad;
         await producto.save();
 
-        res.status(200).json({ mensaje: '✅ Stock reducido correctamente.', variacionActualizada: variacion });
+        res.status(200).json({ 
+            mensaje: '✅ Stock reducido. Disponible: ' + variacion.stock, 
+            variacionActualizada: variacion 
+        });
     } catch (error) {
-        console.error("🐛 Error al reducir stock:", error.message, error.stack);
+        console.error("🐛 Error al reducir stock:", error.message);
         res.status(500).json({ mensaje: '❌ Error al reducir stock.', error: error.message });
     }
 };

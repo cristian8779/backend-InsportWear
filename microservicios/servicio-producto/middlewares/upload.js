@@ -8,11 +8,11 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'productos',
     resource_type: 'image',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'avif'],
+    allowed_formats: ['jpg', 'png', 'jpeg', 'avif', 'webp'], // Se añadió webp
     transformation: [
-      { width: 800, height: 800, crop: 'limit' },
-      { quality: 'auto:best' },
-      { fetch_format: 'auto' }
+      { width: 800, height: 800, crop: 'limit' }, // Redimensiona si excede 800px
+      { quality: 'auto' }, // Antes: 'auto:best' (ahora más ligero sin perder calidad)
+      { fetch_format: 'auto' } // Entrega en formato óptimo (WebP/AVIF si es posible)
     ],
   },
 });
@@ -32,9 +32,10 @@ const upload = multer({
       'image/jpg',
       'image/png',
       'image/avif',
+      'image/webp',
       'image/pjpeg'
     ];
-    const allowedExtensions = ['jpeg', 'jpg', 'png', 'avif'];
+    const allowedExtensions = ['jpeg', 'jpg', 'png', 'avif', 'webp'];
 
     // Archivos con tipo MIME genérico
     if (mime === 'application/octet-stream') {
@@ -42,7 +43,7 @@ const upload = multer({
         return cb(null, true);
       }
       console.warn('⛔ Archivo rechazado por extensión no válida:', extension);
-      return cb(new Error('❌ El formato del archivo no es válido. Solo se permiten imágenes JPG, JPEG, PNG y AVIF.'));
+      return cb(new Error('❌ El formato del archivo no es válido. Solo se permiten imágenes JPG, JPEG, PNG, AVIF y WebP.'));
     }
 
     // Archivos con tipo MIME claro
@@ -51,7 +52,7 @@ const upload = multer({
     }
 
     console.warn('⛔ Tipo MIME no permitido:', mime);
-    return cb(new Error('❌ El tipo de imagen no está permitido. Asegúrate de subir un archivo en formato JPG, JPEG, PNG o AVIF.'));
+    return cb(new Error('❌ El tipo de imagen no está permitido. Asegúrate de subir un archivo en formato JPG, JPEG, PNG, AVIF o WebP.'));
   },
 });
 
