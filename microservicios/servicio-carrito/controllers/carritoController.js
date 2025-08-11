@@ -1,6 +1,8 @@
 const Carrito = require('../models/Carrito');
 const axios = require('axios');
 require('dotenv').config();
+const mongoose = require('mongoose');
+
 
 const PRODUCTO_SERVICE_URL = process.env.PRODUCTO_SERVICE_URL;
 
@@ -190,11 +192,37 @@ const vaciarCarrito = async (req, res) => {
   }
 };
 
+
+const eliminarProductoDeTodosLosCarritos = async (req, res) => {
+  try {
+    const { productoId } = req.params;
+
+    if (!productoId || !mongoose.Types.ObjectId.isValid(productoId)) {
+      return res.status(400).json({ mensaje: 'El ID de producto no es válido.' });
+    }
+
+    const resultado = await Carrito.updateMany(
+      {},
+      { $pull: { productos: { productoId: new mongoose.Types.ObjectId(productoId) } } } // 👈 Convertir a ObjectId
+    );
+
+    res.status(200).json({
+      mensaje: `Producto eliminado de ${resultado.modifiedCount} carritos.`,
+      resultado
+    });
+  } catch (err) {
+    console.error('❌ Error al eliminar producto de todos los carritos:', err);
+    res.status(500).json({ mensaje: 'Error eliminando producto de carritos.', error: err.message });
+  }
+};
+
+
 module.exports = {
   obtenerCarrito,
   agregarAlCarrito,
   actualizarCantidad,
   eliminarDelCarrito,
   obtenerResumenCarrito,
-  vaciarCarrito
+  vaciarCarrito,
+  eliminarProductoDeTodosLosCarritos
 };

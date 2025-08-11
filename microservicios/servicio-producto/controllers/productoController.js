@@ -43,7 +43,12 @@ const crearProducto = async (req, res) => {
 
         // Verificar que la categoría exista en otro servicio
         try {
-            await axios.get(`${process.env.CATEGORIA_SERVICE_URL}/api/categorias/${categoria}`, { timeout: 3000 });
+            await axios.get(`${process.env.CATEGORIA_SERVICE_URL}/api/categorias/${categoria}`, { 
+                timeout: 5000,
+                headers: {
+                    'x-api-key': process.env.MICROSERVICIO_API_KEY
+                }
+            });
         } catch (err) {
             console.error("Error al verificar categoría:", err.message);
             
@@ -89,6 +94,7 @@ const crearProducto = async (req, res) => {
         
         // Limpiar caché
         await redisClient.del('productos_todos');
+        await redisClient.del('filtros_productos'); // Limpiar también caché de filtros
         
         console.log(`✅ Producto creado exitosamente: ${nuevoProducto.nombre}`);
         res.status(201).json({ mensaje: '✅ ¡Producto agregado exitosamente!', producto: nuevoProducto });
@@ -115,19 +121,119 @@ const crearProducto = async (req, res) => {
     }
 };
 
-// 📄 Obtener todos los productos con filtros dinámicos
+// 🎯 Función auxiliar para generar filtros dinámicos
+const generarFiltrosDinamicos = (productos) => {
+    const subcategoriasSet = new Set();
+    const tallasLetraSet = new Set();
+    const tallasNumeroSet = new Set();
+    const coloresMap = new Map(); // Para evitar duplicados por hex
+    let minPrecio = Infinity;
+    let maxPrecio = -Infinity;
+    let minPrecioVariacion = Infinity;
+    let maxPrecioVariacion = -Infinity;
+
+    productos.forEach(producto => {
+        // Subcategorías
+        if (producto.subcategoria) {
+            subcategoriasSet.add(producto.subcategoria);
+        }
+
+        // Precios del producto principal
+        if (producto.precio < minPrecio) minPrecio = producto.precio;
+        if (producto.precio > maxPrecio) maxPrecio = producto.precio;
+
+        // Filtros de variaciones
+        if (producto.variaciones && producto.variaciones.length > 0) {
+            producto.variaciones.forEach(variacion => {
+                // Tallas letra
+                if (variacion.tallaLetra) {
+                    tallasLetraSet.add(variacion.tallaLetra);
+                }
+
+                // Tallas número
+                if (variacion.tallaNumero) {
+                    tallasNumeroSet.add(variacion.tallaNumero);
+                }
+
+                // Colores (usar hex como clave única)
+                if (variacion.color && variacion.color.hex && variacion.color.nombre) {
+                    const hex = variacion.color.hex.toLowerCase();
+                    if (!coloresMap.has(hex)) {
+                        coloresMap.set(hex, {
+                            nombre: variacion.color.nombre,
+                            hex: variacion.color.hex
+                        });
+                    }
+                }
+
+                // Precios de variaciones
+                if (variacion.precio !== undefined) {
+                    if (variacion.precio < minPrecioVariacion) minPrecioVariacion = variacion.precio;
+                    if (variacion.precio > maxPrecioVariacion) maxPrecioVariacion = variacion.precio;
+                }
+            });
+        }
+    });
+
+    // Convertir sets a arrays ordenados
+    const tallasLetraOrdenadas = Array.from(tallasLetraSet).sort((a, b) => {
+        const orden = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+        return orden.indexOf(a) - orden.indexOf(b);
+    });
+
+    const tallasNumeroOrdenadas = Array.from(tallasNumeroSet)
+        .map(Number)
+        .filter(num => !isNaN(num))
+        .sort((a, b) => a - b)
+        .map(String);
+
+    const coloresOrdenados = Array.from(coloresMap.values())
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    return {
+        subcategorias: Array.from(subcategoriasSet).sort(),
+        tallasLetra: tallasLetraOrdenadas,
+        tallasNumero: tallasNumeroOrdenadas,
+        colores: coloresOrdenados,
+        rangoPrecio: {
+            min: minPrecio === Infinity ? 0 : minPrecio,
+            max: maxPrecio === -Infinity ? 0 : maxPrecio
+        },
+        rangoPrecioVariaciones: {
+            min: minPrecioVariacion === Infinity ? 0 : minPrecioVariacion,
+            max: maxPrecioVariacion === -Infinity ? 0 : maxPrecioVariacion
+        }
+    };
+};
+
+// 📄 Obtener todos los productos con filtros dinámicos mejorados
 const obtenerProductos = async (req, res) => {
     const cacheKey = 'productos_todos';
     try {
+        // Verificar caché solo si no hay parámetros de consulta
         const cache = await redisClient.get(cacheKey);
         if (cache && cache.result && Object.keys(req.query).length === 0) {
             console.log('🟢 Productos cargados desde Redis');
             return res.json(JSON.parse(cache.result));
         }
 
-        const { categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda } = req.query;
+        const { 
+            categoria, 
+            subcategoria, 
+            minPrecio, 
+            maxPrecio, 
+            disponible, 
+            busqueda,
+            tallaLetra,
+            tallaNumero,
+            color, // Puede ser nombre del color o hex
+            minPrecioVariacion,
+            maxPrecioVariacion
+        } = req.query;
+        
         let query = {};
 
+        // Filtros básicos del producto
         if (categoria) query.categoria = categoria;
         if (subcategoria) query.subcategoria = subcategoria;
         if (minPrecio || maxPrecio) {
@@ -143,28 +249,94 @@ const obtenerProductos = async (req, res) => {
             ];
         }
 
-        const productos = await Producto.find(query).populate('variaciones');
-        const allProducts = await Producto.find();
-        const subcategoriasSet = new Set();
-        allProducts.forEach(producto => {
-            if (producto.subcategoria) subcategoriasSet.add(producto.subcategoria);
-        });
+        // Obtener productos base
+        let productos = await Producto.find(query).populate('variaciones');
 
-        const filtrosDisponibles = {
-            subcategorias: Array.from(subcategoriasSet).sort(),
-        };
+        // 🔍 Filtrar por variaciones si se especifican filtros de variación
+        if (tallaLetra || tallaNumero || color || minPrecioVariacion || maxPrecioVariacion) {
+            productos = productos.filter(producto => {
+                return producto.variaciones.some(variacion => {
+                    let matches = true;
+
+                    // Filtro por talla letra
+                    if (tallaLetra && variacion.tallaLetra !== tallaLetra) {
+                        matches = false;
+                    }
+
+                    // Filtro por talla número
+                    if (tallaNumero && variacion.tallaNumero !== tallaNumero) {
+                        matches = false;
+                    }
+
+                    // Filtro por color (nombre o hex)
+                    if (color && variacion.color) {
+                        const colorLower = color.toLowerCase();
+                        const nombreColorLower = variacion.color.nombre?.toLowerCase() || '';
+                        const hexColor = variacion.color.hex?.toLowerCase() || '';
+                        
+                        if (!nombreColorLower.includes(colorLower) && hexColor !== colorLower) {
+                            matches = false;
+                        }
+                    }
+
+                    // Filtro por precio de variación
+                    if (minPrecioVariacion && variacion.precio < Number(minPrecioVariacion)) {
+                        matches = false;
+                    }
+                    if (maxPrecioVariacion && variacion.precio > Number(maxPrecioVariacion)) {
+                        matches = false;
+                    }
+
+                    return matches;
+                });
+            });
+        }
+
+        // 📊 Generar filtros dinámicos basados en TODOS los productos (no solo los filtrados)
+        const allProducts = await Producto.find().populate('variaciones');
+        
+        const filtrosDisponibles = generarFiltrosDinamicos(allProducts);
 
         const response = { productos, filtrosDisponibles };
 
+        // Cachear solo si no hay parámetros de consulta
         if (Object.keys(req.query).length === 0) {
             await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
         }
 
-        console.log('🟡 Productos cargados desde DB y procesados');
+        console.log('🟡 Productos cargados desde DB y procesados con filtros dinámicos');
         res.json(response);
     } catch (error) {
         console.error("❌ Error al obtener productos:", error);
         res.status(500).json({ mensaje: '❌ Error al cargar productos.', error: error.message });
+    }
+};
+
+// 🎯 Obtener solo los filtros disponibles (endpoint separado para el frontend)
+const obtenerFiltrosDisponibles = async (req, res) => {
+    const cacheKey = 'filtros_productos';
+    try {
+        // Verificar caché
+        const cache = await redisClient.get(cacheKey);
+        if (cache) {
+            console.log('🟢 Filtros cargados desde Redis');
+            return res.json(JSON.parse(cache));
+        }
+
+        // Obtener todos los productos con variaciones
+        const productos = await Producto.find().populate('variaciones');
+        
+        // Generar filtros dinámicos
+        const filtrosDisponibles = generarFiltrosDinamicos(productos);
+
+        // Cachear los filtros por más tiempo (5 minutos)
+        await redisClient.set(cacheKey, JSON.stringify(filtrosDisponibles), { EX: 300 });
+
+        console.log('🟡 Filtros generados desde DB');
+        res.json(filtrosDisponibles);
+    } catch (error) {
+        console.error("❌ Error al obtener filtros:", error);
+        res.status(500).json({ mensaje: '❌ Error al cargar filtros.', error: error.message });
     }
 };
 
@@ -274,6 +446,7 @@ const actualizarProducto = async (req, res) => {
         
         // Limpiar caché
         await redisClient.del('productos_todos');
+        await redisClient.del('filtros_productos'); // Limpiar también caché de filtros
         
         console.log(`✅ Producto actualizado exitosamente: ${producto.nombre}`);
         res.json({ mensaje: '✅ Producto actualizado correctamente.', producto });
@@ -295,7 +468,7 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-// 🗑️ Eliminar un producto (mejorado)
+// 🗑️ Eliminar un producto (mejorado con limpieza de carritos)
 const eliminarProducto = async (req, res) => {
     try {
         if (!['admin', 'superAdmin'].includes(req.usuario.rol)) {
@@ -303,22 +476,21 @@ const eliminarProducto = async (req, res) => {
         }
 
         const { id } = req.params;
-        const producto = await Producto.findById(id).populate('variaciones'); 
+        const producto = await Producto.findById(id).populate('variaciones');
         if (!producto) {
             return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
         }
 
-        // Eliminar imágenes de variaciones
-        if (producto.variaciones && producto.variaciones.length > 0) {
+        // 🗑 Eliminar imágenes de variaciones (si existen)
+        if (producto.variaciones?.length > 0) {
             console.log(`🗑️ Preparando para eliminar imágenes de ${producto.variaciones.length} variaciones de Cloudinary.`);
             for (const variacion of producto.variaciones) {
-                // Actualizado para el nuevo modelo de una sola imagen
                 if (variacion.imagen?.public_id) {
                     await cloudinary.uploader.destroy(variacion.imagen.public_id);
                     console.log(`   - 🗑️ Imagen de variación eliminada: ${variacion.imagen.public_id}`);
                 }
                 // Mantener compatibilidad con el modelo anterior por si acaso
-                if (variacion.imagenes && variacion.imagenes.length > 0) {
+                if (variacion.imagenes?.length) {
                     for (const img of variacion.imagenes) {
                         if (img.public_id) {
                             await cloudinary.uploader.destroy(img.public_id);
@@ -330,20 +502,42 @@ const eliminarProducto = async (req, res) => {
             console.log("👍 Todas las imágenes de variaciones han sido eliminadas de Cloudinary.");
         }
 
-        // Eliminar la imagen principal del producto
+        // 🗑 Eliminar imagen principal
         if (producto.public_id) {
             await cloudinary.uploader.destroy(producto.public_id);
             console.log(`🗑️ Imagen principal eliminada: ${producto.public_id}`);
         }
 
-        // Eliminar el producto de la base de datos
+        // 🗑 Eliminar el producto de la base de datos
         await Producto.findByIdAndDelete(id);
-        
-        // Limpiar caché
+
+        // 🔗 Notificar al microservicio de carrito para removerlo globalmente
+        if (process.env.CARRITO_SERVICE_URL) {
+            try {
+                const carritoResp = await axios.delete(
+                    `${process.env.CARRITO_SERVICE_URL}/api/carrito/eliminar-producto-global/${id}`,
+                    { 
+                        timeout: 5000,
+                        headers: {
+                            'x-api-key': process.env.MICROSERVICIO_API_KEY
+                        }
+                    }
+                );
+                console.log(`🛒 Producto eliminado de ${carritoResp.data?.resultado?.modifiedCount || 0} carritos: ${carritoResp.status} - ${carritoResp.data?.mensaje || 'OK'}`);
+            } catch (err) {
+                console.warn(`⚠️ No se pudo eliminar el producto ${id} de los carritos: ${err.message}`);
+            }
+        } else {
+            console.warn("⚠️ CARRITO_SERVICE_URL no está configurada, no se notificará al servicio de carrito.");
+        }
+
+        // 🧹 Limpiar caché
         await redisClient.del('productos_todos');
-        
-        console.log(`✅ Producto ${id} eliminado completamente.`);
-        res.json({ mensaje: '✅ Producto eliminado exitosamente.' });
+        await redisClient.del('filtros_productos'); // Limpiar también caché de filtros
+
+        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes y carritos).`);
+        res.json({ mensaje: '✅ Producto eliminado y quitado de todos los carritos.' });
+
     } catch (error) {
         console.error("❌ Error en eliminarProducto:", error);
         res.status(500).json({ mensaje: '❌ Error al eliminar el producto.', error: error.message });
@@ -366,6 +560,10 @@ const cambiarEstadoProducto = async (req, res) => {
         if (!producto) {
             return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
         }
+
+        // Limpiar caché cuando se cambia el estado
+        await redisClient.del('productos_todos');
+        await redisClient.del('filtros_productos');
 
         res.json({ mensaje: '✅ Estado actualizado correctamente.', producto });
     } catch (error) {
@@ -392,6 +590,9 @@ const reducirStock = async (req, res) => {
         producto.stock -= cantidad;
         await producto.save();
 
+        // Limpiar caché cuando se modifica el stock
+        await redisClient.del('productos_todos');
+
         res.json({ mensaje: '✅ Stock general reducido correctamente.', producto });
     } catch (error) {
         console.error('❌ Error al reducir stock:', error);
@@ -402,10 +603,12 @@ const reducirStock = async (req, res) => {
 module.exports = {
     crearProducto,
     obtenerProductos,
+    obtenerFiltrosDisponibles,
     obtenerProductoPorId,
     actualizarProducto,
     eliminarProducto,
     cambiarEstadoProducto,
     obtenerProductosPorCategoria,
     reducirStock,
+    generarFiltrosDinamicos
 };

@@ -6,7 +6,8 @@ const {
     obtenerProductosPorCategoria,
     actualizarProducto,
     eliminarProducto,
-    reducirStock, // Esto es para el stock del producto principal
+    reducirStock, 
+    obtenerFiltrosDisponibles// Esto es para el stock del producto principal
     // ⚠️ reducirStockVariacion no debe venir de productoController, sino de variacionController
 } = require('../controllers/productoController');
 
@@ -127,6 +128,9 @@ router.put('/:productoId/variaciones/:id/reducir-stock', reducirStockVariacion);
 console.log('Ruta PUT /:productoId/variaciones/:id/reducir-stock: Configurada para reducir stock de una variación específica (Ideal para microservicios/carrito).');
 
 // Nueva ruta para agregar una variación a un producto
+
+router.get('/filtros', obtenerFiltrosDisponibles); // NUEVO
+router.get('/', obtenerProductos)
 
 
 module.exports = router;

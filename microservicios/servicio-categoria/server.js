@@ -25,7 +25,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Rutas
 app.use("/api/categorias", require("./routes/categoriaRoutes"));
-app.use("/api/google-search", require("./routes/googleSearchRoutes"));
+;
 
 // Ruta base
 app.get("/", (req, res) => {
