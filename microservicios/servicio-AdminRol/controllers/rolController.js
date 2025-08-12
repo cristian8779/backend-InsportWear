@@ -171,7 +171,7 @@ const confirmarCodigoRol = async (req, res) => {
   });
 };
 
-// ✅ Rechazar (cancelar) invitación de cambio de rol
+// ✅ Rechazar invitación (el usuario invitado la cancela)
 const rechazarInvitacionRol = async (req, res) => {
   try {
     const solicitud = await RolRequest.findOne({
@@ -185,7 +185,7 @@ const rechazarInvitacionRol = async (req, res) => {
       });
     }
 
-    solicitud.estado = "cancelado"; // 🔹 Ajuste aquí
+    solicitud.estado = "cancelado";
     await solicitud.save();
 
     return res.status(200).json({
@@ -199,6 +199,41 @@ const rechazarInvitacionRol = async (req, res) => {
   }
 };
 
+// ✅ Cancelar invitación (SuperAdmin cancela cualquiera)
+const cancelarInvitacionPorSuperAdmin = async (req, res) => {
+  if (req.usuario.rol !== "superAdmin") {
+    return res.status(403).json({
+      mensaje: "Acceso denegado. Solo el SuperAdmin puede cancelar invitaciones.",
+    });
+  }
+
+  const { email } = req.params;
+
+  try {
+    const solicitud = await RolRequest.findOne({
+      email: email.toLowerCase(),
+      estado: "pendiente",
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        mensaje: "No se encontró una invitación pendiente para este usuario.",
+      });
+    }
+
+    solicitud.estado = "cancelado";
+    await solicitud.save();
+
+    return res.status(200).json({
+      mensaje: `❌ Invitación para ${email} cancelada por SuperAdmin.`,
+    });
+  } catch (error) {
+    console.error("❌ Error al cancelar invitación por SuperAdmin:", error.message);
+    return res.status(500).json({
+      mensaje: "Error interno al procesar la cancelación de la invitación.",
+    });
+  }
+};
 
 // ✅ Ver todas las invitaciones
 const listarInvitacionesRol = async (req, res) => {
@@ -263,7 +298,8 @@ const rolPendiente = async (req, res) => {
 module.exports = {
   invitarCambioRol,
   confirmarCodigoRol,
-  rechazarInvitacionRol, // 🚀 Nuevo endpoint
+  rechazarInvitacionRol,
+  cancelarInvitacionPorSuperAdmin, // 🚀 Nuevo método
   listarInvitacionesRol,
-  verificarInvitacionPendiente: rolPendiente // ✅ alias
+  verificarInvitacionPendiente: rolPendiente
 };

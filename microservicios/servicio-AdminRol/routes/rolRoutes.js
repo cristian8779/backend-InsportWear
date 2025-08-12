@@ -8,27 +8,39 @@ const {
   confirmarCodigoRol,
   listarInvitacionesRol,
   verificarInvitacionPendiente, // ✅ Ver si hay invitación
-  rechazarInvitacionRol // ⬅️ Nuevo controlador para rechazar
+  rechazarInvitacionRol         // ✅ Rechazar invitación pendiente
 } = require("../controllers/rolController");
 
 // Middlewares
 const verificarToken = require("../middlewares/verificarToken");
 const esSuperAdmin = require("../middlewares/esSuperAdmin");
 const limitarInvitacion = require("../middlewares/limitarInvitacion");
+const limitarInvitacionPendiente = require("../middlewares/limitarInvitacionPendiente");
 
-// ✅ Ruta para enviar invitación de cambio de rol (solo SuperAdmin)
+
+/**
+ * ✅ Ruta para enviar invitación de cambio de rol
+ * Solo un SuperAdmin puede enviarla.
+ */
 router.post(
   "/invitar",
   verificarToken,
   esSuperAdmin,
   limitarInvitacion,
+  limitarInvitacionPendiente,
   invitarCambioRol
 );
 
-// ✅ Ruta para confirmar el código de la invitación (usuario lo introduce en la app)
+/**
+ * ✅ Ruta para confirmar el código de invitación
+ * El usuario ingresa el código en la app o web para aceptar el cambio de rol.
+ */
 router.post("/confirmar", confirmarCodigoRol);
 
-// ✅ Ruta para ver todas las invitaciones (solo SuperAdmin)
+/**
+ * ✅ Ruta para ver todas las invitaciones
+ * Solo accesible para SuperAdmin.
+ */
 router.get(
   "/invitaciones",
   verificarToken,
@@ -36,14 +48,20 @@ router.get(
   listarInvitacionesRol
 );
 
-// ✅ Ruta: saber si el usuario logueado tiene invitación pendiente
+/**
+ * ✅ Ruta para verificar si el usuario logueado
+ * tiene una invitación pendiente.
+ */
 router.get(
   "/pendiente",
   verificarToken,
   verificarInvitacionPendiente
 );
 
-// ✅ NUEVA Ruta: rechazar invitación (usuario no la acepta)
+/**
+ * ✅ Ruta para rechazar una invitación
+ * El usuario logueado puede cancelar la invitación pendiente.
+ */
 router.post(
   "/rechazar",
   verificarToken,
