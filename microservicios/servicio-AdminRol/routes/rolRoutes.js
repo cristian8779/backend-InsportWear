@@ -7,6 +7,7 @@ const {
   invitarCambioRol,
   confirmarCodigoRol, // ✅ nombre correcto
   listarInvitacionesRol,
+  verificarInvitacionPendiente // ✅ nuevo
 } = require("../controllers/rolController");
 
 // Middlewares
@@ -32,6 +33,13 @@ router.get(
   verificarToken,
   esSuperAdmin,
   listarInvitacionesRol
+);
+
+// ✅ NUEVA Ruta: saber si el usuario logueado tiene invitación pendiente
+router.get(
+  "/pendiente",
+  verificarToken,
+  verificarInvitacionPendiente
 );
 
 module.exports = router;

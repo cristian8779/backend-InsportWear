@@ -200,8 +200,41 @@ const listarInvitacionesRol = async (req, res) => {
   }
 };
 
+// ✅ Ver si el usuario tiene invitación de rol pendiente
+const rolPendiente = async (req, res) => {
+  try {
+    const solicitud = await RolRequest.findOne({
+      email: req.usuario.email,
+      estado: "pendiente",
+      expiracion: { $gt: new Date() },
+    });
+
+    if (!solicitud) {
+      return res.status(200).json({
+        pendiente: false,
+        mensaje: "No tienes invitaciones de rol pendientes.",
+      });
+    }
+
+    return res.status(200).json({
+      pendiente: true,
+      nuevoRol: solicitud.nuevoRol,
+      expiracion: solicitud.expiracion,
+      mensaje: `Tienes una invitación pendiente para ser ${solicitud.nuevoRol}.`,
+    });
+  } catch (error) {
+    console.error("❌ Error al verificar invitación pendiente:", error.message);
+    return res.status(500).json({
+      pendiente: false,
+      mensaje: "Error interno al verificar la invitación.",
+    });
+  }
+};
+
 module.exports = {
   invitarCambioRol,
   confirmarCodigoRol,
   listarInvitacionesRol,
+    verificarInvitacionPendiente: rolPendiente // ✅ alias
+
 };
