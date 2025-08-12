@@ -70,7 +70,7 @@ const invitarCambioRol = async (req, res) => {
   }
 
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiracion = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
+  const expiracion = new Date(Date.now() + 15 * 60 * 1000); // ⏳ 15 minutos
 
   await new RolRequest({
     email,
@@ -91,7 +91,7 @@ const invitarCambioRol = async (req, res) => {
     console.log(`📨 Código enviado a ${email} para cambio de rol a ${nuevoRol}`);
 
     return res.status(200).json({
-      mensaje: `✅ El código fue enviado correctamente a ${email}. El usuario tiene 5 minutos para ingresarlo y confirmar el cambio.`,
+      mensaje: `✅ El código fue enviado correctamente a ${email}. El usuario tiene 15 minutos para ingresarlo y confirmar el cambio.`,
       expiracion: expiracion.toISOString(),
     });
   } catch (error) {
@@ -171,6 +171,35 @@ const confirmarCodigoRol = async (req, res) => {
   });
 };
 
+// ✅ Rechazar (cancelar) invitación de cambio de rol
+const rechazarInvitacionRol = async (req, res) => {
+  try {
+    const solicitud = await RolRequest.findOne({
+      email: req.usuario.email,
+      estado: "pendiente",
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        mensaje: "No tienes invitaciones pendientes para cancelar.",
+      });
+    }
+
+    solicitud.estado = "cancelado"; // 🔹 Ajuste aquí
+    await solicitud.save();
+
+    return res.status(200).json({
+      mensaje: "❌ Has cancelado la invitación de cambio de rol.",
+    });
+  } catch (error) {
+    console.error("❌ Error al cancelar la invitación:", error.message);
+    return res.status(500).json({
+      mensaje: "Error interno al procesar la cancelación de la invitación.",
+    });
+  }
+};
+
+
 // ✅ Ver todas las invitaciones
 const listarInvitacionesRol = async (req, res) => {
   if (req.usuario.rol !== "superAdmin") {
@@ -234,7 +263,7 @@ const rolPendiente = async (req, res) => {
 module.exports = {
   invitarCambioRol,
   confirmarCodigoRol,
+  rechazarInvitacionRol, // 🚀 Nuevo endpoint
   listarInvitacionesRol,
-    verificarInvitacionPendiente: rolPendiente // ✅ alias
-
+  verificarInvitacionPendiente: rolPendiente // ✅ alias
 };

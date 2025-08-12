@@ -5,9 +5,10 @@ const router = express.Router();
 // Controladores
 const {
   invitarCambioRol,
-  confirmarCodigoRol, // ✅ nombre correcto
+  confirmarCodigoRol,
   listarInvitacionesRol,
-  verificarInvitacionPendiente // ✅ nuevo
+  verificarInvitacionPendiente, // ✅ Ver si hay invitación
+  rechazarInvitacionRol // ⬅️ Nuevo controlador para rechazar
 } = require("../controllers/rolController");
 
 // Middlewares
@@ -35,11 +36,18 @@ router.get(
   listarInvitacionesRol
 );
 
-// ✅ NUEVA Ruta: saber si el usuario logueado tiene invitación pendiente
+// ✅ Ruta: saber si el usuario logueado tiene invitación pendiente
 router.get(
   "/pendiente",
   verificarToken,
   verificarInvitacionPendiente
+);
+
+// ✅ NUEVA Ruta: rechazar invitación (usuario no la acepta)
+router.post(
+  "/rechazar",
+  verificarToken,
+  rechazarInvitacionRol
 );
 
 module.exports = router;

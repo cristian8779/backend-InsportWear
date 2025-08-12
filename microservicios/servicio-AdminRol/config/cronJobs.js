@@ -17,17 +17,17 @@ const expirarInvitaciones = async () => {
   }
 };
 
-// 🧹 Eliminar invitaciones expiradas con más de 48 horas
+// 🧹 Eliminar invitaciones expiradas con más de 15 minutos
 const eliminarExpiradasAntiguas = async () => {
-  const hace48Horas = new Date(Date.now() - 48 * 60 * 60 * 1000); // 48h en ms
+  const hace15Min = new Date(Date.now() - 15 * 60 * 1000); // 15 minutos en ms
 
   const resultado = await RolRequest.deleteMany({
     estado: "expirado",
-    expiracion: { $lt: hace48Horas },
+    expiracion: { $lt: hace15Min },
   });
 
   if (resultado.deletedCount > 0) {
-    console.log(`🗑️ ${resultado.deletedCount} invitaciones expiradas eliminadas después de 48 horas`);
+    console.log(`🗑️ ${resultado.deletedCount} invitaciones expiradas eliminadas después de 15 minutos`);
     console.log(`📢 SuperAdmin notificado sobre la eliminación (simulado por consola)`);
     // TODO: aquí puedes usar resend.emails.send(...) si deseas enviar aviso por correo
   }
