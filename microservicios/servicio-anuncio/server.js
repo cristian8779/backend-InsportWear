@@ -1,7 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const anuncioRoutes = require("./routes/anuncio.routes");
+// ✅ Cambiado para que coincida con el archivo que creamos antes
+const anuncioRoutes = require("./routes/anuncio.routes.js"); // Sin .js, sin .routes
 const connectDB = require("./config/database");
 
 // 🔌 Conectar a la base de datos

@@ -1,64 +1,147 @@
+// utils/externalServices.js
 const axios = require('axios');
 
-// Variables base de entorno (sin `/api`)
-const PRODUCTO_SERVICE_URL = process.env.PRODUCTO_SERVICE_URL;
-const CATEGORIA_SERVICE_URL = process.env.CATEGORIA_SERVICE_URL;
-
-// ✅ Obtener productos desde microservicio
+// 🔗 Obtener productos desde microservicio
 const obtenerProductos = async () => {
-  if (!PRODUCTO_SERVICE_URL) {
-    console.error("❌ PRODUCTO_SERVICE_URL no está definido en el archivo .env");
-    return [];
-  }
+    try {
+        const response = await axios.get(`${process.env.PRODUCTO_SERVICE_URL}/api/productos`, {
+            timeout: 5000, // 5 segundos timeout
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
 
-  const url = `${PRODUCTO_SERVICE_URL}/api/productos`;
-  console.log(`🔎 [Productos] Haciendo request a: ${url}`);
+        console.log('✅ [Productos] Conexión exitosa al microservicio');
+        
+        // 🔍 Debug: ver qué estructura devuelve
+        console.log('📊 [Productos] Tipo de respuesta:', typeof response.data);
+        console.log('📊 [Productos] Estructura recibida:', Object.keys(response.data || {}));
+        
+        let productos = [];
+        
+        // 🔧 Manejar diferentes formatos de respuesta
+        if (Array.isArray(response.data)) {
+            // Formato: [productos...]
+            productos = response.data;
+        } else if (response.data && Array.isArray(response.data.productos)) {
+            // Formato: { productos: [productos...] }
+            productos = response.data.productos;
+        } else if (response.data && Array.isArray(response.data.data)) {
+            // Formato: { data: [productos...] }
+            productos = response.data.data;
+        } else if (response.data && response.data.items && Array.isArray(response.data.items)) {
+            // Formato: { items: [productos...] }
+            productos = response.data.items;
+        } else {
+            console.warn('⚠️ [Productos] Formato de respuesta no reconocido:', response.data);
+            productos = [];
+        }
 
-  try {
-    const { data } = await axios.get(url);
-    console.log(`✅ [Productos] Respuesta recibida (${Array.isArray(data) ? data.length : 0} items)`);
-    return data;
-  } catch (error) {
-    if (error.response) {
-      console.error(`❌ [Productos] Error ${error.response.status}: ${error.response.statusText}`);
-      console.error(`📦 [Productos] Detalles:`, error.response.data);
-    } else if (error.request) {
-      console.error(`❌ [Productos] No hubo respuesta del servidor:`, error.message);
-    } else {
-      console.error(`❌ [Productos] Error al configurar la petición:`, error.message);
+        console.log(`✅ [Productos] Respuesta procesada (${productos.length} items)`);
+        return productos;
+
+    } catch (error) {
+        console.error('❌ [Productos] Error al conectar con microservicio:', error.message);
+        
+        if (error.code === 'ECONNREFUSED') {
+            console.error('🔌 [Productos] Microservicio no disponible en:', process.env.PRODUCTO_SERVICE_URL);
+        } else if (error.code === 'ETIMEDOUT') {
+            console.error('⏱️ [Productos] Timeout al conectar con microservicio');
+        }
+        
+        // Devolver array vacío en caso de error para evitar crashes
+        return [];
     }
-    return [];
-  }
 };
 
-// ✅ Obtener categorías desde microservicio
+// 🔗 Obtener categorías desde microservicio
 const obtenerCategorias = async () => {
-  if (!CATEGORIA_SERVICE_URL) {
-    console.error("❌ CATEGORIA_SERVICE_URL no está definido en el archivo .env");
-    return [];
-  }
+    try {
+        const response = await axios.get(`${process.env.CATEGORIA_SERVICE_URL}/api/categorias`, {
+            timeout: 5000,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
 
-  const url = `${CATEGORIA_SERVICE_URL}/api/categorias`;
-  console.log(`🔎 [Categorías] Haciendo request a: ${url}`);
+        console.log('✅ [Categorías] Conexión exitosa al microservicio');
+        
+        // 🔍 Debug: ver qué estructura devuelve
+        console.log('📊 [Categorías] Tipo de respuesta:', typeof response.data);
+        console.log('📊 [Categorías] Estructura recibida:', Object.keys(response.data || {}));
+        
+        let categorias = [];
+        
+        // 🔧 Manejar diferentes formatos de respuesta
+        if (Array.isArray(response.data)) {
+            // Formato: [categorias...]
+            categorias = response.data;
+        } else if (response.data && Array.isArray(response.data.categorias)) {
+            // Formato: { categorias: [categorias...] }
+            categorias = response.data.categorias;
+        } else if (response.data && Array.isArray(response.data.data)) {
+            // Formato: { data: [categorias...] }
+            categorias = response.data.data;
+        } else if (response.data && response.data.items && Array.isArray(response.data.items)) {
+            // Formato: { items: [categorias...] }
+            categorias = response.data.items;
+        } else {
+            console.warn('⚠️ [Categorías] Formato de respuesta no reconocido:', response.data);
+            categorias = [];
+        }
 
-  try {
-    const { data } = await axios.get(url);
-    console.log(`✅ [Categorías] Respuesta recibida (${Array.isArray(data) ? data.length : 0} items)`);
-    return data;
-  } catch (error) {
-    if (error.response) {
-      console.error(`❌ [Categorías] Error ${error.response.status}: ${error.response.statusText}`);
-      console.error(`📦 [Categorías] Detalles:`, error.response.data);
-    } else if (error.request) {
-      console.error(`❌ [Categorías] No hubo respuesta del servidor:`, error.message);
-    } else {
-      console.error(`❌ [Categorías] Error al configurar la petición:`, error.message);
+        console.log(`✅ [Categorías] Respuesta procesada (${categorias.length} items)`);
+        return categorias;
+
+    } catch (error) {
+        console.error('❌ [Categorías] Error al conectar con microservicio:', error.message);
+        
+        if (error.code === 'ECONNREFUSED') {
+            console.error('🔌 [Categorías] Microservicio no disponible en:', process.env.CATEGORIA_SERVICE_URL);
+        } else if (error.code === 'ETIMEDOUT') {
+            console.error('⏱️ [Categorías] Timeout al conectar con microservicio');
+        }
+        
+        // Devolver array vacío en caso de error para evitar crashes
+        return [];
     }
-    return [];
-  }
+};
+
+// 🧪 Función de prueba para verificar microservicios
+const probarMicroservicios = async () => {
+    console.log('🧪 Probando conexión a microservicios...');
+    
+    try {
+        const [productos, categorias] = await Promise.all([
+            obtenerProductos(),
+            obtenerCategorias()
+        ]);
+        
+        console.log(`📊 Productos disponibles: ${productos.length}`);
+        console.log(`📊 Categorías disponibles: ${categorias.length}`);
+        
+        // Mostrar algunos ejemplos si hay datos
+        if (productos.length > 0) {
+            console.log('📦 Ejemplo de producto:', {
+                id: productos[0]._id || productos[0].id,
+                nombre: productos[0].nombre || productos[0].name || 'Sin nombre'
+            });
+        }
+        
+        if (categorias.length > 0) {
+            console.log('📁 Ejemplo de categoría:', {
+                id: categorias[0]._id || categorias[0].id,
+                nombre: categorias[0].nombre || categorias[0].name || 'Sin nombre'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error al probar microservicios:', error.message);
+    }
 };
 
 module.exports = {
-  obtenerProductos,
-  obtenerCategorias,
+    obtenerProductos,
+    obtenerCategorias,
+    probarMicroservicios
 };
