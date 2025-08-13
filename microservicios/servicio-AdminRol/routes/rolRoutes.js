@@ -2,13 +2,12 @@
 const express = require("express");
 const router = express.Router();
 
-// Controladores
+// ✅ IMPORTACIÓN CORRECTA desde rolController
 const {
   invitarCambioRol,
   confirmarCodigoRol,
-  listarInvitacionesRol,
-  verificarInvitacionPendiente, // ✅ Ver si hay invitación
-  rechazarInvitacionRol         // ✅ Rechazar invitación pendiente
+  verificarInvitacionPendiente,
+  rechazarInvitacionRol
 } = require("../controllers/rolController");
 
 // Middlewares
@@ -17,13 +16,18 @@ const esSuperAdmin = require("../middlewares/esSuperAdmin");
 const limitarInvitacion = require("../middlewares/limitarInvitacion");
 const limitarInvitacionPendiente = require("../middlewares/limitarInvitacionPendiente");
 
-
 /**
  * ✅ Ruta para enviar invitación de cambio de rol
- * Solo un SuperAdmin puede enviarla.
+ * POST /api/rol/invitar - Solo un SuperAdmin puede enviarla
  */
 router.post(
   "/invitar",
+  (req, res, next) => {
+    console.log("📩 [POST] /api/rol/invitar");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
   verificarToken,
   esSuperAdmin,
   limitarInvitacion,
@@ -33,37 +37,47 @@ router.post(
 
 /**
  * ✅ Ruta para confirmar el código de invitación
- * El usuario ingresa el código en la app o web para aceptar el cambio de rol.
+ * POST /api/rol/confirmar - El usuario debe estar logueado
  */
-router.post("/confirmar", confirmarCodigoRol);
-
-/**
- * ✅ Ruta para ver todas las invitaciones
- * Solo accesible para SuperAdmin.
- */
-router.get(
-  "/invitaciones",
+router.post(
+  "/confirmar",
+  (req, res, next) => {
+    console.log("🔑 [POST] /api/rol/confirmar");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
   verificarToken,
-  esSuperAdmin,
-  listarInvitacionesRol
+  confirmarCodigoRol
 );
 
 /**
- * ✅ Ruta para verificar si el usuario logueado
- * tiene una invitación pendiente.
+ * ✅ Ruta para verificar si el usuario logueado tiene una invitación pendiente
+ * GET /api/rol/pendiente
  */
 router.get(
   "/pendiente",
+  (req, res, next) => {
+    console.log("⏳ [GET] /api/rol/pendiente");
+    console.log("🔹 Headers:", req.headers);
+    next();
+  },
   verificarToken,
   verificarInvitacionPendiente
 );
 
 /**
  * ✅ Ruta para rechazar una invitación
- * El usuario logueado puede cancelar la invitación pendiente.
+ * POST /api/rol/rechazar - El usuario logueado puede cancelar su invitación pendiente
  */
 router.post(
   "/rechazar",
+  (req, res, next) => {
+    console.log("🚫 [POST] /api/rol/rechazar");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
   verificarToken,
   rechazarInvitacionRol
 );

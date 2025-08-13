@@ -83,14 +83,24 @@ const registrar = async (req, res) => {
       console.warn("⚠️ Error al enviar correo de bienvenida:", error.message);
     }
 
+    // ✅ CORREGIDO: Incluir email en el token
     const accessToken = jwt.sign(
-      { id: usuarioCreado._id, rol: nuevaCredencial.rol },
+      { 
+        id: usuarioCreado._id, 
+        email: emailLimpio, // ✅ Agregar email
+        rol: nuevaCredencial.rol 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    // ✅ CORREGIDO: Incluir email en el refresh token
     const refreshToken = jwt.sign(
-      { id: usuarioCreado._id, rol: nuevaCredencial.rol },
+      { 
+        id: usuarioCreado._id, 
+        email: emailLimpio, // ✅ Agregar email
+        rol: nuevaCredencial.rol 
+      },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
@@ -152,14 +162,24 @@ const login = async (req, res) => {
       });
     }
 
+    // ✅ CORREGIDO: Incluir email en el token
     const accessToken = jwt.sign(
-      { id: usuario._id, rol: credencial.rol },
+      { 
+        id: usuario._id, 
+        email: credencial.email, // ✅ Agregar email
+        rol: credencial.rol 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    // ✅ CORREGIDO: Incluir email en el refresh token
     const refreshToken = jwt.sign(
-      { id: usuario._id, rol: credencial.rol },
+      { 
+        id: usuario._id, 
+        email: credencial.email, // ✅ Agregar email
+        rol: credencial.rol 
+      },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
@@ -203,8 +223,13 @@ const renovarToken = async (req, res) => {
       });
     }
 
+    // ✅ CORREGIDO: Mantener email en el nuevo token
     const nuevoAccessToken = jwt.sign(
-      { id: decoded.id, rol: decoded.rol },
+      { 
+        id: decoded.id, 
+        email: decoded.email, // ✅ Mantener email del token anterior
+        rol: decoded.rol 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -222,15 +247,21 @@ const renovarToken = async (req, res) => {
 // ✅ Verificar token JWT
 const verificarToken = (req, res, next) => {
   const token = req.header("Authorization")?.split(" ")[1];
+  
+  console.log(`🔑 [verificarToken] Token recibido: ${token}`);
+  
   if (!token) {
     return res.status(401).json({ mensaje: "Acceso no autorizado. Inicia sesión para continuar." });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.usuario = decoded;
+    console.log(`✅ [verificarToken] Token verificado. Payload:`, decoded);
+    
+    req.usuario = decoded; // Ahora incluirá id, email y rol
     next();
   } catch (err) {
+    console.error(`🚫 [verificarToken] Error:`, err.message);
     return res.status(403).json({
       mensaje: "Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.",
     });
@@ -252,8 +283,6 @@ const obtenerCredencialPorId = async (req, res) => {
     res.status(500).json({ mensaje: "No se pudo obtener la información. Intenta más tarde." });
   }
 };
-
-
 
 // ✅ Verificar si un email ya está registrado
 const emailExiste = async (req, res) => {

@@ -1,21 +1,81 @@
-const jwt = require('jsonwebtoken');
+// middlewares/verificarToken.js
+const jwt = require("jsonwebtoken");
 
 const verificarToken = (req, res, next) => {
-  const token = req.header('Authorization');
-
-  if (!token) {
-    return res.status(401).json({ mensaje: 'Acceso denegado. Token no proporcionado.' });
-  }
-
+  console.log("🔐 [verificarToken] Iniciando verificación de token");
+  console.log("🔐 [verificarToken] Headers recibidos:", req.headers);
+  
   try {
-    const tokenSinBearer = token.replace('Bearer ', '');
-    const verificado = jwt.verify(tokenSinBearer, process.env.JWT_SECRET);
-    console.log('Token verificado:', verificado);
+    // Obtener el token del header Authorization
+    const authHeader = req.headers.authorization;
+    console.log("🔐 [verificarToken] Authorization header:", authHeader);
     
-    req.usuario = verificado; // ✅ Asegúrate de usar 'usuario' como en esAdmin.js
+    if (!authHeader) {
+      console.warn("⚠️ [verificarToken] No se encontró header Authorization");
+      return res.status(401).json({ 
+        mensaje: "Token no proporcionado. Incluye Authorization: Bearer <token>" 
+      });
+    }
+
+    // Verificar formato "Bearer <token>"
+    if (!authHeader.startsWith("Bearer ")) {
+      console.warn("⚠️ [verificarToken] Formato de token inválido");
+      return res.status(401).json({ 
+        mensaje: "Formato de token inválido. Usa: Bearer <token>" 
+      });
+    }
+
+    // Extraer el token
+    const token = authHeader.split(" ")[1];
+    console.log("🔐 [verificarToken] Token extraído:", token ? `${token.substring(0, 20)}...` : "null");
+    
+    if (!token) {
+      console.warn("⚠️ [verificarToken] Token vacío después de extraer");
+      return res.status(401).json({ mensaje: "Token vacío" });
+    }
+
+    // Verificar JWT_SECRET
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+      console.error("❌ [verificarToken] JWT_SECRET no está definido en .env");
+      return res.status(500).json({ mensaje: "Error de configuración del servidor" });
+    }
+
+    // Decodificar y verificar el token
+    console.log("🔐 [verificarToken] Decodificando token...");
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log("✅ [verificarToken] Token decodificado exitosamente:", {
+      id: decoded.id,
+      email: decoded.email,
+      rol: decoded.rol,
+      iat: decoded.iat,
+      exp: decoded.exp
+    });
+
+    // Agregar usuario al request
+    req.usuario = {
+      id: decoded.id,
+      email: decoded.email,
+      rol: decoded.rol,
+      nombre: decoded.nombre || null
+    };
+
+    console.log("✅ [verificarToken] req.usuario establecido:", req.usuario);
     next();
-  } catch (err) {
-    res.status(400).json({ mensaje: 'Token inválido' });
+
+  } catch (error) {
+    console.error("❌ [verificarToken] Error al verificar token:", error.message);
+    
+    // Manejar diferentes tipos de errores JWT
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ mensaje: "Token expirado" });
+    } else if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ mensaje: "Token inválido" });
+    } else if (error.name === "NotBeforeError") {
+      return res.status(401).json({ mensaje: "Token no válido aún" });
+    } else {
+      return res.status(401).json({ mensaje: "Error de autenticación" });
+    }
   }
 };
 
