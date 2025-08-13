@@ -55,8 +55,9 @@ const loginGoogle = async (req, res) => {
 
       // Buscar usuario en el microservicio por ID de credenciales
       const respuesta = await axios.get(
-        `${process.env.USUARIO_SERVICE_URL}/api/usuario/por-credencial/${credencial._id}`
-      );
+    `${process.env.USUARIO_SERVICE_URL}/api/usuario/credencial/${credencial._id}`
+   );
+
       usuario = respuesta.data;
     } else {
       // 🔹 Crear nueva credencial para login con Google
