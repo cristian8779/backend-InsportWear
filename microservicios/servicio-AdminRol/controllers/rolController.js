@@ -5,7 +5,7 @@ const axios = require("axios");
 const jwt = require("jsonwebtoken"); // ⬅️ para extraer datos del token si falta req.usuario
 
 const AUTH_URL = process.env.AUTH_URL;
-const JWT_SECRET = process.env.JWT_SECRET || "secret"; // Ajusta según tu entorno
+const JWT_SECRET = process.env.JWT_SECRET 
 
 // 🔧 Obtener usuario externo por email
 const getUsuarioPorEmail = async (email) => {
@@ -73,7 +73,7 @@ const invitarCambioRol = async (req, res) => {
     try {
       console.log(`📨 [invitarCambioRol] Enviando correo a ${email} con código: ${codigo}`);
       await resend.emails.send({
-        from: "Soporte <soporte@soportee.store>",
+        from: "InsportWear <soporte@soportee.store>",
         to: email,
         subject: `Código para cambio de rol a: ${nuevoRol}`,
         html: generarPlantillaRol(credencial.nombre || email, nuevoRol, codigo),

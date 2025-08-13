@@ -74,9 +74,9 @@ const registrar = async (req, res) => {
 
     try {
       await resend.emails.send({
-        from: "Soporte <soporte@soportee.store>",
+        from: "InsportWear <soporte@soportee.store>",
         to: emailLimpio,
-        subject: "Bienvenido a la plataforma",
+        subject: "Bienvenido a InsportWear",
         html: generarPlantillaBienvenida(nombre),
       });
     } catch (error) {

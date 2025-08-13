@@ -63,7 +63,7 @@ const enviarCodigoResetPassword = async (req, res) => {
     await recuperacion.save();
 
     await resend.emails.send({
-      from: "soporte@soportee.store",
+       from: "InsportWear <soporte@soportee.store>",
       to: [credencial.email],
       subject: "Tu código para restablecer la contraseña",
       html: generarPlantillaCodigoReset(usuario.nombre || "usuario", codigo),

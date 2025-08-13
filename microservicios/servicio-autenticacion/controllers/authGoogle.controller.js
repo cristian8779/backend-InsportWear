@@ -80,18 +80,18 @@ const loginGoogle = async (req, res) => {
 
       // Enviar correo de bienvenida
       await resend.emails.send({
-        from: "Soporte <soporte@soportee.store>",
+        from: "InsportWear <soporte@soportee.store>",
         to: email,
-        subject: "¡Bienvenido a la plataforma!",
+        subject: "¡Bienvenido a InsportWear!",
         html: generarPlantillaBienvenida(nombre),
       });
     }
 
     // Firmar token JWT
     const token = jwt.sign(
-      { id: credencial._id, rol: credencial.rol },
+        { id: credencial._id, rol: credencial.rol, email: credencial.email },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     return res.json({
