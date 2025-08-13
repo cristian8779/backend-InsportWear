@@ -13,11 +13,12 @@ const loginGoogle = async (req, res) => {
 
   if (!idToken) {
     return res.status(400).json({
-      mensaje: "No se recibió el token de Google. Asegúrate de haber iniciado sesión correctamente.",
+      mensaje: "No recibimos el token de Google. Intenta iniciar sesión de nuevo.",
     });
   }
 
   try {
+    // Verificar token de Google
     const ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -30,7 +31,7 @@ const loginGoogle = async (req, res) => {
 
     if (!email) {
       return res.status(400).json({
-        mensaje: "No se pudo obtener el correo electrónico desde el token de Google.",
+        mensaje: "No pudimos obtener tu correo desde Google. Intenta con otra cuenta.",
       });
     }
 
@@ -38,20 +39,27 @@ const loginGoogle = async (req, res) => {
     let usuario = null;
 
     if (credencial) {
+      // 🔹 Si no tiene campo "metodo" pero su password es GOOGLE_LOGIN, lo actualizamos
+      if (!credencial.metodo && credencial.password === "GOOGLE_LOGIN") {
+        credencial.metodo = "google";
+        await credencial.save();
+      }
+
+      // Si el método de registro no fue Google, bloquear
       if (credencial.metodo !== "google") {
         return res.status(400).json({
           mensaje:
-            "Ya existe una cuenta registrada con este correo usando una contraseña. Por favor, inicia sesión de forma tradicional.",
+            "Este correo ya está registrado con contraseña. Por favor, inicia sesión usando tu correo y contraseña.",
         });
       }
 
-      // Buscar usuario desde microservicio por ID de credenciales
+      // Buscar usuario en el microservicio por ID de credenciales
       const respuesta = await axios.get(
         `${process.env.USUARIO_SERVICE_URL}/api/usuario/por-credencial/${credencial._id}`
       );
       usuario = respuesta.data;
     } else {
-      // Crear credencial nueva
+      // 🔹 Crear nueva credencial para login con Google
       credencial = new Credenciales({
         email,
         password: "GOOGLE_LOGIN",
@@ -60,10 +68,10 @@ const loginGoogle = async (req, res) => {
       });
       await credencial.save();
 
-      // Crear perfil del usuario con imagen de Google
+      // Crear perfil del usuario con la imagen de Google
       const respuesta = await axios.post(`${process.env.USUARIO_SERVICE_URL}/api/usuario`, {
         nombre,
-        imagenPerfil: picture, // Enviar la imagen de Google
+        imagenPerfil: picture,
         credenciales: credencial._id,
       });
 
@@ -73,7 +81,7 @@ const loginGoogle = async (req, res) => {
       await resend.emails.send({
         from: "Soporte <soporte@soportee.store>",
         to: email,
-        subject: "Bienvenido a la plataforma",
+        subject: "¡Bienvenido a la plataforma!",
         html: generarPlantillaBienvenida(nombre),
       });
     }
@@ -86,20 +94,20 @@ const loginGoogle = async (req, res) => {
     );
 
     return res.json({
-      mensaje: "Has iniciado sesión correctamente con tu cuenta de Google.",
+      mensaje: "Inicio de sesión exitoso con Google ✅",
       token,
       usuario: {
         nombre: usuario.nombre,
         email: credencial.email,
         rol: credencial.rol,
-        foto: usuario.imagenPerfil, // Imagen almacenada correctamente
+        foto: usuario.imagenPerfil,
       },
     });
   } catch (error) {
     console.error("❌ Error verificando token de Google:", error);
     return res.status(401).json({
       mensaje:
-        "El token de Google no es válido o ha expirado. Por favor, volvé a intentarlo.",
+        "No pudimos iniciar sesión con Google. El token no es válido o ha expirado. Intenta nuevamente.",
       error: error.message,
     });
   }

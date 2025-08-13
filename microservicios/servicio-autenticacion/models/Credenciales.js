@@ -18,6 +18,11 @@ const CredencialesSchema = new mongoose.Schema({
     enum: ["usuario", "admin", "superAdmin"],
     default: 'usuario'
   },
+  metodo: {
+    type: String,
+    enum: ["tradicional", "google"],
+    default: "tradicional"
+  },
   refreshToken: {
     type: String,
     default: null
