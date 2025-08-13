@@ -1,91 +1,130 @@
 # Servicio Carrito
 
-## ¿Qué hace este microservicio?
-Gestiona los carritos de compra de los usuarios, permitiendo agregar, actualizar y eliminar productos antes de la compra final.
+Este servicio gestiona el **carrito de compras** de los usuarios dentro de la plataforma **InsportWear**.  
+Permite agregar productos al carrito, listar su contenido, actualizar cantidades, eliminar productos y vaciar el carrito.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-carrito
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **dotenv** - Manejo de variables de entorno.
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Agregar producto al carrito
-- **POST** `/api/carrito`
-- **Requiere:** Token JWT válido y datos del producto.
-- **Ejemplo de body (JSON):**
-  ```json
-  {
-    "productoId": "64b1f2c1e1a2b3c4d5e6f7a8",
-    "cantidad": 2,
-    "variacion": { "tallaNumero": "38", "color": "Negro" }
-  }
-  ```
-
-### Obtener carrito del usuario
-- **GET** `/api/carrito`
-- **Requiere:** Token JWT válido.
-
-### Actualizar ítem del carrito
-- **PUT** `/api/carrito/:id`
-- **Requiere:** Token JWT válido y datos a modificar.
-- **Ejemplo de body:**
-  ```json
-  {
-    "cantidad": 3
-  }
-  ```
-
-### Eliminar ítem del carrito
-- **DELETE** `/api/carrito/:id`
-- **Requiere:** Token JWT válido.
+```
+servicio-carrito/
+│── config/                 # Configuración de base de datos
+│── controllers/            # Lógica de negocio del carrito
+│── middlewares/             # Verificación de token
+│── models/                  # Esquema del carrito
+│── routes/                  # Rutas de la API
+│── utils/                   # Funciones auxiliares
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
+```
 
 ---
 
-## Cosas importantes y tips
-- **Autenticación:** El token JWT es obligatorio para todas las operaciones. Agrégalo en el header:
-  ```
-  Authorization: Bearer <tu_token>
-  ```
-- **Stock:** El servicio verifica el stock antes de agregar productos al carrito.
-- **Errores comunes:**
-  - No enviar el token o enviar uno inválido.
-  - Agregar productos sin stock suficiente.
-- **Recomendación:** Siempre revisa la respuesta del endpoint para confirmar la operación.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-carrito
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
 
 ---
 
-## Estructura de carpetas explicada
-- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `middlewares/` — Funciones para autenticación y validación
-- `config/` — Configuración de base de datos
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Define middlewares globales.
+- Carga rutas de carrito (`routes/carrito.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/carritoController.js`
+- `agregarProducto()` → Añade un producto al carrito.
+- `obtenerCarrito()` → Lista el contenido del carrito del usuario.
+- `actualizarCantidad()` → Cambia la cantidad de un producto en el carrito.
+- `eliminarProducto()` → Elimina un producto específico del carrito.
+- `vaciarCarrito()` → Elimina todos los productos del carrito.
+
+### `middlewares/auth.js`
+- Middleware que verifica el token JWT para asegurar que el usuario está autenticado.
+
+### `models/Carrito.js`
+- Esquema de Mongoose para el carrito:
+  - `usuarioId`
+  - `productos` (array con id de producto, cantidad y precio)
+  - `fechaCreacion`
+
+### `routes/carrito.routes.js`
+- `POST /carrito` → Agregar producto al carrito.
+- `GET /carrito` → Listar productos del carrito.
+- `PUT /carrito/:productoId` → Actualizar cantidad de producto.
+- `DELETE /carrito/:productoId` → Eliminar producto del carrito.
+- `DELETE /carrito` → Vaciar carrito.
+
+### `utils/helpers.js`
+- Funciones auxiliares para manejo de datos.
 
 ---
 
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /carrito | Agregar producto |
+| GET    | /carrito | Listar productos |
+| PUT    | /carrito/:productoId | Actualizar cantidad |
+| DELETE | /carrito/:productoId | Eliminar producto |
+| DELETE | /carrito | Vaciar carrito |
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🛡 Seguridad
+- Uso de **JWT** para autenticación.
+- Validación de usuario antes de modificar el carrito.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.

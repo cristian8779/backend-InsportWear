@@ -1,82 +1,131 @@
 # Servicio Venta
 
-## ¿Qué hace este microservicio?
-Gestiona las ventas, registra transacciones y controla el stock después de cada venta. Permite registrar y listar ventas de forma segura.
+Este servicio gestiona las **ventas** dentro de la plataforma **InsportWear**.  
+Permite registrar ventas, obtener historial, consultar ventas por usuario y generar reportes.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-venta
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **dotenv** - Manejo de variables de entorno.
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Registrar venta
-- **POST** `/api/ventas`
-- **Requiere:** Token JWT válido y datos de la venta.
-- **Ejemplo de body (JSON):**
-  ```json
-  {
-    "usuarioId": "64b1f2c1e1a2b3c4d5e6f7a8",
-    "productos": [
-      { "productoId": "...", "cantidad": 2, "variacion": { "tallaNumero": "38", "color": "Negro" } }
-    ],
-    "total": 300.00
-  }
-  ```
-
-### Listar ventas
-- **GET** `/api/ventas`
-- **Respuesta ejemplo:**
-  ```json
-  [
-    { "_id": "...", "usuarioId": "...", "total": 300, "fecha": "2025-07-20T12:00:00Z" }
-  ]
-  ```
+```
+servicio-venta/
+│── config/                 # Configuración de base de datos
+│── controllers/            # Lógica de negocio de ventas
+│── middlewares/            # Autenticación y roles
+│── models/                  # Esquema de venta
+│── routes/                  # Rutas de la API
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
+```
 
 ---
 
-## Cosas importantes y tips
-- **Autenticación:** El token JWT es obligatorio para registrar ventas. Agrégalo en el header:
-  ```
-  Authorization: Bearer <tu_token>
-  ```
-- **Errores comunes:**
-  - No enviar el token o enviar uno inválido.
-  - No enviar productos o total.
-- **Recomendación:** Siempre revisa la respuesta del endpoint para confirmar la operación.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-venta
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
 
 ---
 
-## Estructura de carpetas explicada
-- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `utils/` — Funciones auxiliares reutilizables
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Carga rutas de ventas (`routes/venta.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/ventaController.js`
+- `registrarVenta()` → Crea una nueva venta con los productos del carrito.
+- `obtenerVentas()` → Lista todas las ventas (solo admin).
+- `obtenerVentaPorId()` → Obtiene detalles de una venta específica.
+- `obtenerVentasPorUsuario()` → Lista ventas asociadas a un usuario.
+- `generarReporte()` → Genera un reporte de ventas (filtrado por fecha, usuario, etc.).
+
+### `middlewares/auth.js`
+- Verifica el token JWT.
+
+### `middlewares/roles.js`
+- Valida permisos según el rol del usuario.
+
+### `models/Venta.js`
+- Esquema de Mongoose para ventas:
+  - `usuarioId`
+  - `productos` (array con id, cantidad, precio)
+  - `total`
+  - `fechaVenta`
+  - `estado`
+
+### `routes/venta.routes.js`
+- `POST /ventas` → Registrar venta.
+- `GET /ventas` → Listar ventas.
+- `GET /ventas/:id` → Obtener venta por ID.
+- `GET /ventas/usuario/:idUsuario` → Ventas por usuario.
+- `GET /ventas/reporte` → Generar reporte.
 
 ---
 
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /ventas | Registrar venta |
+| GET    | /ventas | Listar ventas |
+| GET    | /ventas/:id | Obtener venta |
+| GET    | /ventas/usuario/:idUsuario | Ventas por usuario |
+| GET    | /ventas/reporte | Generar reporte |
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🛡 Seguridad
+- Autenticación mediante **JWT**.
+- Validación de roles para operaciones críticas.
+- Integración con **servicio-carrito** para procesar ventas.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.

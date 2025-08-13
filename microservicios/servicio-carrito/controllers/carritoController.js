@@ -40,9 +40,9 @@ const obtenerCarrito = async (req, res) => {
   }
 };
 
-// ➕ Agregar producto al carrito
+
 const agregarAlCarrito = async (req, res) => {
-  const { productoId, cantidad = 1 } = req.body;
+  const { productoId, variacionId, cantidad = 1 } = req.body;
 
   if (!productoId || cantidad < 1) {
     return res.status(400).json({ mensaje: 'Por favor, seleccioná un producto válido y una cantidad mayor a cero.' });
@@ -50,40 +50,81 @@ const agregarAlCarrito = async (req, res) => {
 
   try {
     const userId = req.user._id;
-    let carrito = await Carrito.findOne({ usuarioId: userId });
 
+    // Traer el producto del microservicio
+    const producto = await obtenerProductoRemoto(productoId);
+    if (!producto) {
+      return res.status(404).json({ mensaje: 'Producto no encontrado.' });
+    }
+
+    let precio = producto.precio;
+    let atributos = {};
+
+    // Si se mandó variacionId, buscarla
+    if (variacionId) {
+      const variacion = producto.variaciones?.find(v => String(v._id) === String(variacionId));
+      if (!variacion) {
+        return res.status(404).json({ mensaje: 'Variación no encontrada.' });
+      }
+      precio = variacion.precio;
+      atributos = {
+        color: variacion.color || {},
+        tallaLetra: variacion.tallaLetra,
+        tallaNumero: variacion.tallaNumero,
+        imagen: variacion.imagen
+      };
+    }
+
+    let carrito = await Carrito.findOne({ usuarioId: userId });
     if (!carrito) {
       carrito = new Carrito({ usuarioId: userId, productos: [] });
     }
 
-    const index = carrito.productos.findIndex(p => p.productoId.toString() === productoId);
+    // Buscar si ya existe mismo producto + variación
+    const index = carrito.productos.findIndex(p =>
+      p.productoId.toString() === productoId &&
+      String(p.variacionId || '') === String(variacionId || '')
+    );
+
     if (index >= 0) {
       carrito.productos[index].cantidad += cantidad;
     } else {
-      carrito.productos.push({ productoId, cantidad });
+      carrito.productos.push({
+        productoId,
+        variacionId: variacionId || null,
+        cantidad,
+        precio,
+        atributos
+      });
     }
 
     await carrito.save();
     res.status(200).json({ mensaje: 'Producto agregado al carrito con éxito.', carrito });
+
   } catch (err) {
     console.error('❌ Error al agregar al carrito:', err);
     res.status(500).json({ mensaje: 'No pudimos agregar el producto. Probá de nuevo en unos minutos.' });
   }
 };
 
+
 // 🔁 Actualizar cantidad
 const actualizarCantidad = async (req, res) => {
-  const { productoId, cantidad } = req.body;
+  const { productoId, variacionId, cantidad } = req.body;
 
   if (!productoId || cantidad < 1) {
-    return res.status(400).json({ mensaje: 'La cantidad debe ser al menos 1. Verificá tu selección.' });
+    return res.status(400).json({ mensaje: 'La cantidad debe ser al menos 1.' });
   }
 
   try {
     const carrito = await Carrito.findOne({ usuarioId: req.user._id });
-    if (!carrito) return res.status(404).json({ mensaje: 'No encontramos tu carrito. ¿Querés crear uno nuevo?' });
+    if (!carrito) return res.status(404).json({ mensaje: 'No encontramos tu carrito.' });
 
-    const producto = carrito.productos.find(p => p.productoId.toString() === productoId);
+    const producto = carrito.productos.find(p =>
+      p.productoId.toString() === productoId &&
+      String(p.variacionId || '') === String(variacionId || '')
+    );
+
     if (!producto) return res.status(404).json({ mensaje: 'Este producto no está en tu carrito.' });
 
     producto.cantidad = cantidad;
@@ -92,13 +133,13 @@ const actualizarCantidad = async (req, res) => {
     res.status(200).json({ mensaje: 'Cantidad actualizada correctamente.', carrito });
   } catch (err) {
     console.error('❌ Error al actualizar cantidad:', err);
-    res.status(500).json({ mensaje: 'No pudimos actualizar la cantidad. Intentá más tarde.' });
+    res.status(500).json({ mensaje: 'No pudimos actualizar la cantidad.' });
   }
 };
 
 // 🗑 Eliminar producto
 const eliminarDelCarrito = async (req, res) => {
-  const { productoId } = req.body;
+  const { productoId, variacionId } = req.body;
 
   if (!productoId) {
     return res.status(400).json({ mensaje: 'Necesitamos el ID del producto a eliminar.' });
@@ -108,20 +149,20 @@ const eliminarDelCarrito = async (req, res) => {
     const carrito = await Carrito.findOne({ usuarioId: req.user._id });
     if (!carrito) return res.status(404).json({ mensaje: 'No encontramos tu carrito.' });
 
-    const index = carrito.productos.findIndex(p => p.productoId.toString() === productoId);
-    if (index === -1) {
-      return res.status(404).json({ mensaje: 'Este producto no estaba en tu carrito.' });
-    }
+    carrito.productos = carrito.productos.filter(p =>
+      !(p.productoId.toString() === productoId &&
+        String(p.variacionId || '') === String(variacionId || ''))
+    );
 
-    carrito.productos.splice(index, 1);
     await carrito.save();
-
     res.status(200).json({ mensaje: 'Producto eliminado del carrito.', carrito });
   } catch (err) {
     console.error('❌ Error al eliminar producto:', err);
-    res.status(500).json({ mensaje: 'No pudimos eliminar el producto. Intentá más tarde.' });
+    res.status(500).json({ mensaje: 'No pudimos eliminar el producto.' });
   }
 };
+
+
 
 // 🧾 Resumen del carrito
 const obtenerResumenCarrito = async (req, res) => {
@@ -134,42 +175,23 @@ const obtenerResumenCarrito = async (req, res) => {
       return res.status(200).json({ mensaje: 'Tu carrito está vacío.', productos: [], total: 0 });
     }
 
-    const resumen = await Promise.all(
-      carrito.productos.map(async (item) => {
-        const producto = await obtenerProductoRemoto(item.productoId);
-        if (!producto) return null;
+    const resumen = carrito.productos.map(item => ({
+      productoId: item.productoId,
+      variacionId: item.variacionId,
+      cantidad: item.cantidad,
+      precio: item.precio,
+      atributos: item.atributos,
+      subtotal: item.precio * item.cantidad
+    }));
 
-        return {
-          producto: {
-            id: producto._id,
-            nombre: producto.nombre,
-            precio: producto.precio,
-            imagen: producto.imagen || null
-          },
-          cantidad: item.cantidad,
-          subtotal: producto.precio * item.cantidad
-        };
-      })
-    );
-
-    const productosValidos = resumen.filter(Boolean);
-
-    // ⚠️ Limpiar productos inexistentes
-    const productoIdsValidos = new Set(productosValidos.map(p => p.producto.id.toString()));
-    carrito.productos = carrito.productos.filter(p => productoIdsValidos.has(p.productoId.toString()));
-    await carrito.save();
-
-    if (!productosValidos.length) {
-      return res.status(200).json({ mensaje: 'Todos los productos de tu carrito ya no están disponibles.', productos: [], total: 0 });
-    }
-
-    const total = productosValidos.reduce((acc, p) => acc + p.subtotal, 0);
-    res.status(200).json({ productos: productosValidos, total });
+    const total = resumen.reduce((acc, p) => acc + p.subtotal, 0);
+    res.status(200).json({ productos: resumen, total });
   } catch (err) {
     console.error('❌ Error al obtener resumen del carrito:', err);
-    res.status(500).json({ mensaje: 'No pudimos generar el resumen. Probá más tarde.' });
+    res.status(500).json({ mensaje: 'No pudimos generar el resumen.' });
   }
 };
+
 
 // 🧹 Vaciar carrito
 const vaciarCarrito = async (req, res) => {

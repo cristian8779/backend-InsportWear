@@ -1,107 +1,139 @@
 # Servicio Producto
 
-## ¿Qué hace este microservicio?
-Gestiona productos, variaciones (tallas, colores), stock, imágenes, favoritos, historial y reseñas. Permite crear, listar, actualizar y eliminar productos, así como gestionar el stock y las variaciones de forma flexible.
+Este servicio gestiona los **productos** dentro de la plataforma **InsportWear**.  
+Permite crear, listar, actualizar, eliminar y buscar productos, asociarlos a categorías y gestionar su inventario.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-producto
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **dotenv** - Manejo de variables de entorno.
+- **Multer** - Manejo de subida de imágenes.
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Crear producto
-- **POST** `/api/productos`
-- **Requiere:** Token JWT válido (admin/superAdmin), multipart/form-data.
-- **Ejemplo de body (form-data):**
-  - `nombre`: Zapatilla deportiva
-  - `descripcion`: Zapatilla cómoda para correr
-  - `precio`: 120
-  - `categoria`: 64b1f2c1e1a2b3c4d5e6f7a8
-  - `subcategoria`: Running
-  - `variaciones`: (como string JSON)
-    ```json
-    [
-      { "tallaNumero": "38", "tallaLetra": "M", "color": "Negro", "stock": 10 },
-      { "tallaLetra": "L", "color": "Blanco", "stock": 5 }
-    ]
-    ```
-  - `imagen`: (archivo de imagen)
-
-### Listar productos y filtros
-- **GET** `/api/productos`
-- **Respuesta ejemplo:**
-  ```json
-  {
-    "productos": [ /* array de productos */ ],
-    "filtrosDisponibles": {
-      "subcategorias": ["Running"],
-      "tallasNumero": ["38"],
-      "tallasLetra": ["M", "L"],
-      "colores": ["Negro", "Blanco"]
-    }
-  }
-  ```
-
-### Obtener producto por ID
-- **GET** `/api/productos/:id`
-
-### Actualizar producto
-- **PUT** `/api/productos/:id`
-
-### Eliminar producto
-- **DELETE** `/api/productos/:id`
-
-### Reducir stock de una variación
-- **PUT** `/api/productos/:id/reducir-stock-variacion`
-- **Ejemplo de body:**
-  ```json
-  { "cantidad": 2, "tallaNumero": "38", "color": "Negro" }
-  ```
+```
+servicio-producto/
+│── config/                 # Configuración de base de datos
+│── controllers/            # Lógica de negocio de productos
+│── middlewares/            # Verificación de token y roles
+│── models/                  # Esquema de producto
+│── routes/                  # Rutas de la API
+│── uploads/                 # Carpeta para imágenes de productos
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
+```
 
 ---
 
-## Cosas importantes y tips
-- El campo `variaciones` debe enviarse como string JSON en multipart/form-data.
-- El token JWT debe ser válido y de un usuario con rol adecuado.
-- Las imágenes se suben a Cloudinary automáticamente.
-- Si cambias la estructura de variaciones, actualiza también el frontend y la documentación.
-- Si usas Docker, asegúrate de exponer el puerto y enlazar la base de datos.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-producto
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
 
 ---
 
-## Estructura de carpetas explicada
-- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `middlewares/` — Funciones para autenticación, subida de archivos, etc.
-- `config/` — Configuración de base de datos y servicios externos
-- `utils/` — Funciones auxiliares reutilizables
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Habilita subida de imágenes con Multer.
+- Carga rutas de productos (`routes/producto.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/productoController.js`
+- `crearProducto()` → Crea un nuevo producto con imagen.
+- `obtenerProductos()` → Lista todos los productos.
+- `obtenerProductoPorId()` → Obtiene un producto por ID.
+- `actualizarProducto()` → Modifica un producto existente.
+- `eliminarProducto()` → Elimina un producto.
+- `buscarProductos()` → Busca productos por nombre o categoría.
+
+### `middlewares/auth.js`
+- Middleware que verifica el token JWT.
+
+### `middlewares/roles.js`
+- Middleware que valida que el usuario tenga rol de administrador para ciertas operaciones.
+
+### `models/Producto.js`
+- Esquema de Mongoose para productos:
+  - `nombre`
+  - `descripcion`
+  - `precio`
+  - `stock`
+  - `categoriaId`
+  - `imagen`
+  - `fechaCreacion`
+
+### `routes/producto.routes.js`
+- `POST /productos` → Crear producto.
+- `GET /productos` → Listar productos.
+- `GET /productos/:id` → Obtener producto por ID.
+- `PUT /productos/:id` → Actualizar producto.
+- `DELETE /productos/:id` → Eliminar producto.
+- `GET /productos/buscar/:termino` → Buscar producto.
 
 ---
 
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /productos | Crear producto |
+| GET    | /productos | Listar productos |
+| GET    | /productos/:id | Obtener producto |
+| PUT    | /productos/:id | Actualizar producto |
+| DELETE | /productos/:id | Eliminar producto |
+| GET    | /productos/buscar/:termino | Buscar producto |
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🛡 Seguridad
+- Uso de **JWT** para autenticación.
+- Validación de rol administrador para operaciones críticas.
+- Control de inventario para evitar ventas de productos sin stock.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.

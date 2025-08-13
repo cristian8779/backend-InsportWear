@@ -6,10 +6,27 @@ const itemSchema = new mongoose.Schema({
     ref: 'Producto',
     required: true
   },
+  variacionId: {
+    type: mongoose.Schema.Types.ObjectId, // opcional
+    ref: 'Variacion'
+  },
   cantidad: {
     type: Number,
     required: true,
     min: 1
+  },
+  precio: {
+    type: Number,
+    required: true
+  },
+  atributos: {
+    color: {
+      nombre: { type: String },
+      hex: { type: String }
+    },
+    tallaLetra: { type: String },
+    tallaNumero: { type: String },
+    imagen: { type: String }
   }
 }, { _id: false });
 

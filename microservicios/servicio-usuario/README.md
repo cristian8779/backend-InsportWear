@@ -1,87 +1,138 @@
 # Servicio Usuario
 
-## ¿Qué hace este microservicio?
-Gestiona los usuarios, sus datos personales, favoritos, historial y preferencias. Permite crear, listar, actualizar y eliminar usuarios, así como gestionar sus relaciones con otros servicios.
+Este servicio administra la **gestión de usuarios** dentro de la plataforma **InsportWear**.  
+Permite registrar usuarios, actualizar sus datos, eliminar cuentas, asignar roles y obtener información de perfil.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-usuario
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **bcrypt** - Cifrado de contraseñas.
+- **dotenv** - Manejo de variables de entorno.
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Crear usuario
-- **POST** `/api/usuarios`
-- **Ejemplo de body (JSON):**
-  ```json
-  {
-    "nombre": "Carlos",
-    "correo": "carlos@correo.com",
-    "password": "123456"
-  }
-  ```
-
-### Obtener usuario por ID
-- **GET** `/api/usuarios/:id`
-
-### Actualizar usuario
-- **PUT** `/api/usuarios/:id`
-- **Ejemplo de body:**
-  ```json
-  {
-    "nombre": "Carlos Actualizado"
-  }
-  ```
-
-### Eliminar usuario
-- **DELETE** `/api/usuarios/:id`
+```
+servicio-usuario/
+│── config/                 # Configuración de base de datos
+│── controllers/            # Lógica de negocio de usuarios
+│── middlewares/            # Autenticación y autorización
+│── models/                  # Esquema de usuario
+│── routes/                  # Rutas de la API
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
+```
 
 ---
 
-## Cosas importantes y tips
-- **Autenticación:** El token JWT es obligatorio para operaciones protegidas. Agrégalo en el header:
-  ```
-  Authorization: Bearer <tu_token>
-  ```
-- **Errores comunes:**
-  - No enviar el token o enviar uno inválido.
-  - Intentar modificar/eliminar un usuario sin permisos.
-- **Recomendación:** Siempre revisa la respuesta del endpoint para confirmar la operación.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-usuario
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
 
 ---
 
-## Estructura de carpetas explicada
-- `controller/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `middlewares/` — Funciones para autenticación y validación
-- `config/` — Configuración de base de datos
-- `utils/` — Funciones auxiliares reutilizables
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Carga rutas de usuarios (`routes/usuario.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/usuarioController.js`
+- `registrarUsuario()` → Crea un nuevo usuario con contraseña cifrada.
+- `obtenerUsuarios()` → Lista todos los usuarios (solo admin).
+- `obtenerUsuarioPorId()` → Obtiene datos de un usuario específico.
+- `actualizarUsuario()` → Modifica datos de un usuario.
+- `eliminarUsuario()` → Elimina un usuario.
+- `asignarRol()` → Cambia el rol de un usuario.
+- `perfilUsuario()` → Obtiene el perfil del usuario autenticado.
+
+### `middlewares/auth.js`
+- Verifica el token JWT.
+
+### `middlewares/roles.js`
+- Valida que el usuario tenga permisos adecuados (admin, usuario normal, etc.).
+
+### `models/Usuario.js`
+- Esquema de Mongoose para usuarios:
+  - `nombre`
+  - `correo`
+  - `password`
+  - `rol`
+  - `fechaRegistro`
+
+### `routes/usuario.routes.js`
+- `POST /usuarios` → Registrar usuario.
+- `GET /usuarios` → Listar usuarios.
+- `GET /usuarios/:id` → Obtener usuario por ID.
+- `PUT /usuarios/:id` → Actualizar usuario.
+- `DELETE /usuarios/:id` → Eliminar usuario.
+- `PATCH /usuarios/:id/rol` → Cambiar rol.
+- `GET /usuarios/perfil` → Perfil del usuario autenticado.
 
 ---
 
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /usuarios | Registrar usuario |
+| GET    | /usuarios | Listar usuarios |
+| GET    | /usuarios/:id | Obtener usuario |
+| PUT    | /usuarios/:id | Actualizar usuario |
+| DELETE | /usuarios/:id | Eliminar usuario |
+| PATCH  | /usuarios/:id/rol | Cambiar rol |
+| GET    | /usuarios/perfil | Perfil del usuario |
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🛡 Seguridad
+- Contraseñas cifradas con **bcrypt**.
+- Autenticación mediante **JWT**.
+- Validación de roles para acceso a datos sensibles.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.

@@ -1,99 +1,129 @@
 # Servicio Categoría
 
-## ¿Qué es este microservicio?
-Este microservicio se encarga de la gestión de **categorías** y **subcategorías** de productos. Permite crear, listar, actualizar y eliminar categorías, así como asociar imágenes a cada una. Es fundamental para organizar los productos en la plataforma y facilitar búsquedas y filtros.
+Este servicio gestiona las **categorías de productos** dentro de la plataforma **InsportWear**.  
+Permite crear, listar, actualizar y eliminar categorías, asegurando que los productos estén organizados correctamente.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-categoria
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **dotenv** - Manejo de variables de entorno.
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Crear una categoría
-- **POST** `/api/categorias`
-- **Requiere:** Token JWT válido (admin/superAdmin) y datos de la categoría.
-- **Ejemplo de body (JSON):**
-  ```json
-  {
-    "nombre": "Calzado",
-    "descripcion": "Productos para pies",
-    "imagen": "(archivo de imagen, multipart/form-data)"
-  }
-  ```
-
-### Listar todas las categorías
-- **GET** `/api/categorias`
-- **Respuesta ejemplo:**
-  ```json
-  [
-    { "_id": "...", "nombre": "Calzado", "descripcion": "...", "imagen": "url" },
-    { "_id": "...", "nombre": "Ropa", "descripcion": "...", "imagen": "url" }
-  ]
-  ```
-
-### Actualizar una categoría
-- **PUT** `/api/categorias/:id`
-- **Requiere:** Token JWT válido y datos a modificar.
-- **Ejemplo de body:**
-  ```json
-  {
-    "nombre": "Calzado deportivo"
-  }
-  ```
-
-### Eliminar una categoría
-- **DELETE** `/api/categorias/:id`
-- **Requiere:** Token JWT válido.
-
----
-
-## Cosas importantes y tips
-- **Imágenes:** Las imágenes de categoría se suben automáticamente a Cloudinary. Si subes una nueva imagen al actualizar, la anterior se elimina.
-- **Autenticación:** Todas las operaciones de creación, actualización y eliminación requieren un token JWT válido de un usuario con permisos.
-- **Errores comunes:**
-  - No enviar el token o enviar uno inválido.
-  - No enviar el nombre de la categoría.
-  - Intentar eliminar una categoría que no existe.
-- **Recomendación:** Siempre revisa la respuesta del endpoint para ver si la operación fue exitosa o si hubo algún error.
-
----
-
-## Estructura de carpetas explicada
-- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `middlewares/` — Funciones que se ejecutan antes de los controladores (ej: autenticación)
-- `config/` — Configuración de base de datos y servicios externos
-- `utils/` — Funciones auxiliares reutilizables
-
----
-
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`:
 ```
-Authorization: Bearer <tu_token>
+servicio-categoria/
+│── config/                 # Configuración de base de datos
+│── controllers/            # Lógica de negocio de categorías
+│── middlewares/            # Verificación de token y roles
+│── models/                  # Esquema de categoría
+│── routes/                  # Rutas de la API
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
 ```
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-categoria
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
+
+---
+
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Define middlewares globales.
+- Carga rutas de categorías (`routes/categoria.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/categoriaController.js`
+- `crearCategoria()` → Crea una nueva categoría.
+- `obtenerCategorias()` → Lista todas las categorías.
+- `obtenerCategoriaPorId()` → Obtiene una categoría específica.
+- `actualizarCategoria()` → Modifica una categoría existente.
+- `eliminarCategoria()` → Elimina una categoría.
+
+### `middlewares/auth.js`
+- Middleware que verifica el token JWT.
+
+### `middlewares/roles.js`
+- Middleware que valida que el usuario tenga rol de administrador para ciertas operaciones.
+
+### `models/Categoria.js`
+- Esquema de Mongoose para categorías:
+  - `nombre`
+  - `descripcion`
+  - `fechaCreacion`
+
+### `routes/categoria.routes.js`
+- `POST /categorias` → Crear categoría.
+- `GET /categorias` → Listar todas las categorías.
+- `GET /categorias/:id` → Obtener categoría por ID.
+- `PUT /categorias/:id` → Actualizar categoría.
+- `DELETE /categorias/:id` → Eliminar categoría.
+
+---
+
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /categorias | Crear categoría |
+| GET    | /categorias | Listar categorías |
+| GET    | /categorias/:id | Obtener categoría por ID |
+| PUT    | /categorias/:id | Actualizar categoría |
+| DELETE | /categorias/:id | Eliminar categoría |
+
+---
+
+## 🛡 Seguridad
+- Uso de **JWT** para autenticación.
+- Validación de rol administrador para operaciones críticas.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.

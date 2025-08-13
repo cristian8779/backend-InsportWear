@@ -1,93 +1,135 @@
 # Servicio Pago
 
-## ¿Qué hace este microservicio?
-Gestiona los pagos realizados por los usuarios, registra transacciones y puede integrarse con pasarelas de pago externas. Es esencial para llevar el control de las compras y su estado.
+Este servicio gestiona el **proceso de pagos** dentro de la plataforma **InsportWear**.  
+Permite registrar pagos, verificar transacciones y actualizar el estado de los pedidos una vez confirmados.
 
 ---
 
-## Instalación y ejecución paso a paso
+## 📌 Tecnologías utilizadas
 
-1. **Ubícate en la carpeta del servicio:**
-   ```bash
-   cd microservicios/servicio-pago
-   ```
-2. **Instala las dependencias necesarias:**
-   ```bash
-   npm install
-   ```
-3. **Inicia el microservicio:**
-   ```bash
-   npm start
-   ```
-   - Para desarrollo con recarga automática:
-     ```bash
-     npm run dev
-     ```
+- **Node.js** - Entorno de ejecución.
+- **Express.js** - Framework para construir APIs REST.
+- **MongoDB + Mongoose** - Base de datos NoSQL.
+- **JWT (Json Web Token)** - Autenticación segura.
+- **dotenv** - Manejo de variables de entorno.
+- **Integración con pasarela de pagos** (Stripe, PayPal u otra, según configuración).
 
 ---
 
-## Endpoints principales y ejemplos de uso
+## 📂 Estructura del proyecto
 
-### Registrar un pago
-- **POST** `/api/pagos`
-- **Requiere:** Token JWT válido y datos del pago.
-- **Ejemplo de body (JSON):**
-  ```json
-  {
-    "usuarioId": "64b1f2c1e1a2b3c4d5e6f7a8",
-    "monto": 150.00,
-    "metodo": "tarjeta",
-    "referencia": "1234567890",
-    "estado": "aprobado"
-  }
-  ```
-- **Respuesta esperada:**
-  ```json
-  {
-    "mensaje": "Pago registrado correctamente.",
-    "pago": { /* datos del pago */ }
-  }
-  ```
-
-### Listar pagos
-- **GET** `/api/pagos`
-- **Respuesta ejemplo:**
-  ```json
-  [
-    { "_id": "...", "usuarioId": "...", "monto": 150, "estado": "aprobado" },
-    { "_id": "...", "usuarioId": "...", "monto": 200, "estado": "pendiente" }
-  ]
-  ```
+```
+servicio-pago/
+│── config/                 # Configuración de base de datos y pasarela de pago
+│── controllers/            # Lógica de negocio para pagos
+│── middlewares/            # Verificación de token
+│── models/                  # Esquema de pagos
+│── routes/                  # Rutas de la API
+│── utils/                   # Funciones auxiliares para pagos
+│── server.js                # Punto de entrada
+│── package.json             # Dependencias y scripts
+│── .env                     # Variables de entorno
+```
 
 ---
 
-## Cosas importantes y tips
-- **Autenticación:** El token JWT es obligatorio para registrar pagos. Agrégalo en el header:
-  ```
-  Authorization: Bearer <tu_token>
-  ```
-- **Estados de pago:** Usa valores claros como `aprobado`, `pendiente`, `rechazado`.
-- **Errores comunes:**
-  - No enviar el token o enviar uno inválido.
-  - No enviar el monto o el método de pago.
-  - Intentar registrar un pago duplicado.
-- **Recomendación:** Siempre revisa la respuesta del endpoint para confirmar el estado del pago.
+## 🚀 Instalación y ejecución
+
+1. **Clonar repositorio**
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd servicio-pago
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+Crear un archivo `.env` con:
+```
+PORT=3000
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=...
+PAYMENT_PROVIDER_KEY=...
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+npm start
+```
 
 ---
 
-## Estructura de carpetas explicada
-- `controllers/` — Lógica de negocio (qué hacer cuando llega una petición)
-- `models/` — Esquemas de Mongoose (estructura de los datos en MongoDB)
-- `routes/` — Definición de rutas y métodos HTTP
-- `services/` — Integraciones con pasarelas de pago externas
-- `utils/` — Funciones auxiliares reutilizables
+## 📜 Descripción de archivos y funciones
+
+### `server.js`
+- Configura Express.
+- Conecta a MongoDB (`config/database.js`).
+- Carga rutas de pagos (`routes/pago.routes.js`).
+
+### `config/database.js`
+- Conexión a MongoDB usando Mongoose.
+
+### `controllers/pagoController.js`
+- `crearPago()` → Registra un nuevo pago.
+- `obtenerPagos()` → Lista todos los pagos (solo admins).
+- `obtenerPagoPorId()` → Obtiene un pago específico.
+- `verificarPago()` → Confirma si un pago fue exitoso.
+- `actualizarEstadoPago()` → Cambia el estado de un pago (pendiente, completado, fallido).
+
+### `middlewares/auth.js`
+- Middleware que verifica el token JWT.
+
+### `models/Pago.js`
+- Esquema de Mongoose para pagos:
+  - `usuarioId`
+  - `pedidoId`
+  - `monto`
+  - `metodoPago`
+  - `estado`
+  - `fecha`
+
+### `routes/pago.routes.js`
+- `POST /pagos` → Crear un nuevo pago.
+- `GET /pagos` → Listar pagos (solo admins).
+- `GET /pagos/:id` → Obtener pago por ID.
+- `POST /pagos/verificar` → Verificar transacción.
+- `PUT /pagos/:id` → Actualizar estado de pago.
+
+### `utils/paymentHelper.js`
+- Funciones para interactuar con la pasarela de pago.
 
 ---
 
-## Pruebas rápidas
-Puedes usar Thunder Client, Postman o cualquier cliente HTTP para probar los endpoints. Recuerda siempre enviar el token JWT en el header `Authorization`.
+## 📡 Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST   | /pagos | Crear pago |
+| GET    | /pagos | Listar pagos |
+| GET    | /pagos/:id | Obtener pago |
+| POST   | /pagos/verificar | Verificar transacción |
+| PUT    | /pagos/:id | Actualizar estado |
 
 ---
 
-## ¿A quién preguntar dudas?
-Si tienes problemas, revisa primero los mensajes de error y la consola. Si no logras resolverlo, contacta al equipo de backend o revisa la documentación interna del proyecto.
+## 🛡 Seguridad
+- Uso de **JWT** para autenticación.
+- Verificación de rol para acceso a pagos de otros usuarios.
+- Comunicación segura con la pasarela de pagos.
+
+---
+
+## 🤝 Contribuir
+1. Hacer un fork.
+2. Crear una rama: `git checkout -b nueva-funcionalidad`.
+3. Commit: `git commit -m "Agrega nueva funcionalidad"`.
+4. Push: `git push origin nueva-funcionalidad`.
+5. Abrir un Pull Request.
+
+---
+
+## 📄 Licencia
+Proyecto privado para **InsportWear**.
