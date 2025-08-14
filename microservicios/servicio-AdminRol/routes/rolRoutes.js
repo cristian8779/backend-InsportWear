@@ -8,7 +8,8 @@ const {
   verificarInvitacionPendiente,
   rechazarInvitacionRol,
   listarInvitacionesRol,
-  eliminarTodasInvitaciones // 👈 nuevo controlador
+  cancelarInvitacionPorSuperAdmin, // 👈 AGREGADO - Faltaba esta importación
+  eliminarTodasInvitaciones
 } = require("../controllers/rolController");
 
 // Middlewares
@@ -19,6 +20,7 @@ const limitarInvitacionPendiente = require("../middlewares/limitarInvitacionPend
 
 /**
  * ✅ Ruta para enviar invitación de cambio de rol
+ * POST /api/rol/invitar
  */
 router.post(
   "/invitar",
@@ -37,6 +39,7 @@ router.post(
 
 /**
  * ✅ Ruta para confirmar el código de invitación
+ * POST /api/rol/confirmar
  */
 router.post(
   "/confirmar",
@@ -52,6 +55,7 @@ router.post(
 
 /**
  * ✅ Ruta para verificar invitación pendiente
+ * GET /api/rol/pendiente
  */
 router.get(
   "/pendiente",
@@ -66,6 +70,7 @@ router.get(
 
 /**
  * ✅ Ruta para rechazar invitación
+ * POST /api/rol/rechazar
  */
 router.post(
   "/rechazar",
@@ -81,6 +86,7 @@ router.post(
 
 /**
  * ✅ Ruta para listar invitaciones
+ * GET /api/rol/invitaciones
  */
 router.get(
   "/invitaciones",
@@ -95,13 +101,30 @@ router.get(
 );
 
 /**
- * 🚨 Ruta para eliminar TODAS las invitaciones (solo SuperAdmin con confirmación)
- * DELETE /api/rol/invitaciones
+ * ✅ Ruta para cancelar invitación específica por SuperAdmin
+ * DELETE /api/rol/cancelar/:email
  */
 router.delete(
-  "/invitaciones",
+  "/cancelar/:email",
   (req, res, next) => {
-    console.log("⚠️ [DELETE] /api/rol/invitaciones");
+    console.log("🛑 [DELETE] /api/rol/cancelar/:email");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Params:", req.params);
+    next();
+  },
+  verificarToken,
+  esSuperAdmin,
+  cancelarInvitacionPorSuperAdmin
+);
+
+/**
+ * 🚨 Ruta para eliminar TODAS las invitaciones (solo SuperAdmin con confirmación)
+ * DELETE /api/rol/invitaciones/todas
+ */
+router.delete(
+  "/invitaciones/todas",
+  (req, res, next) => {
+    console.log("⚠️ [DELETE] /api/rol/invitaciones/todas");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
 

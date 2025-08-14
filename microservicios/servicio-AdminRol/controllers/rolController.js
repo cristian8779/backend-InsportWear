@@ -53,43 +53,34 @@ const invitarCambioRol = async (req, res) => {
       return res.status(403).json({ mensaje: "Solo el SuperAdmin puede enviar invitaciones de cambio de rol." });
     }
 
-    // 🚫 Verificar límite de superAdmin y admin existentes
-    try {
-      const { data } = await axios.get(`${AUTH_URL}/usuarios`, { timeout: 4000 });
-      const usuarios = data?.usuarios || [];
-
-      const totalSuperAdmins = usuarios.filter(u => u.rol === "superAdmin").length;
-      const totalAdmins = usuarios.filter(u => u.rol === "admin").length;
-
-      if (nuevoRol === "superAdmin" && totalSuperAdmins >= 2) {
-        return res.status(400).json({ mensaje: "No se pueden crear más de 2 superAdmin." });
-      }
-
-      if (nuevoRol === "admin" && totalAdmins >= 5) {
-        return res.status(400).json({ mensaje: "No se pueden crear más de 5 admin." });
-      }
-    } catch (error) {
-      console.error("❌ [invitarCambioRol] Error al verificar límites de roles:", error.message);
-      return res.status(500).json({ mensaje: "No se pudo verificar la cantidad de roles actuales." });
-    }
-
+    // 🔍 Verificar que el usuario existe
     const credencial = await getUsuarioPorEmail(email);
     if (!credencial) {
       console.warn("⚠️ [invitarCambioRol] Usuario no encontrado:", email);
       return res.status(404).json({ mensaje: "No se encontró un usuario con ese correo electrónico." });
     }
 
+    // 🚫 Verificar si ya tiene el rol solicitado
+    if (credencial.rol === nuevoRol) {
+      console.warn(`⚠️ [invitarCambioRol] Usuario ${email} ya tiene el rol ${nuevoRol}`);
+      return res.status(400).json({ mensaje: `El usuario ya tiene el rol de ${nuevoRol}.` });
+    }
+
+    // 📝 Verificar si ya existe una invitación pendiente
     const yaExiste = await RolRequest.findOne({ email, estado: "pendiente" });
     if (yaExiste) {
       console.warn(`⚠️ [invitarCambioRol] Ya existe invitación pendiente para ${email}`);
       return res.status(409).json({ mensaje: "Este usuario ya tiene una invitación pendiente." });
     }
 
+    // 🎲 Generar código y fecha de expiración
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiracion = new Date(Date.now() + 15 * 60 * 1000);
+    const expiracion = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
+    // 💾 Guardar solicitud en base de datos
     await new RolRequest({ email, nuevoRol, codigo, expiracion, estado: "pendiente" }).save();
 
+    // 📧 Enviar correo electrónico
     try {
       console.log(`📨 [invitarCambioRol] Enviando correo a ${email} con código: ${codigo}`);
       await resend.emails.send({
@@ -98,9 +89,12 @@ const invitarCambioRol = async (req, res) => {
         subject: `Código para cambio de rol a: ${nuevoRol}`,
         html: generarPlantillaRol(credencial.nombre || email, nuevoRol, codigo),
       });
+      
       console.log(`✅ [invitarCambioRol] Código enviado a ${email}`);
       return res.status(200).json({
         mensaje: `✅ Código enviado correctamente a ${email}.`,
+        email: email,
+        nuevoRol: nuevoRol,
         expiracion: expiracion.toISOString(),
       });
     } catch (error) {
@@ -314,26 +308,26 @@ const rolPendiente = async (req, res) => {
 };
 
 // ✅ Eliminar TODAS las invitaciones (SuperAdmin + Confirmación de seguridad)
-const eliminarTodasInvitaciones  = async (req, res) => {
-  console.log("⚠️ [eliminarTodasLasInvitaciones] Solicitud recibida");
+const eliminarTodasInvitaciones = async (req, res) => {
+  console.log("⚠️ [eliminarTodasInvitaciones] Solicitud recibida");
 
   try {
     if (!req.usuario || req.usuario.rol !== "superAdmin") {
-      console.warn("🚫 [eliminarTodasLasInvitaciones] No autorizado");
+      console.warn("🚫 [eliminarTodasInvitaciones] No autorizado");
       return res.status(403).json({ mensaje: "Solo el SuperAdmin puede eliminar todas las invitaciones." });
     }
 
     const confirmacion = req.body?.confirmacion;
     if (confirmacion !== "ELIMINAR TODO") {
-      console.warn("⚠️ [eliminarTodasLasInvitaciones] Confirmación inválida");
+      console.warn("⚠️ [eliminarTodasInvitaciones] Confirmación inválida");
       return res.status(400).json({ mensaje: "Debes escribir exactamente 'ELIMINAR TODO' para confirmar." });
     }
 
     const resultado = await RolRequest.deleteMany({});
-    console.log(`🗑️ [eliminarTodasLasInvitaciones] ${resultado.deletedCount} invitaciones eliminadas`);
+    console.log(`🗑️ [eliminarTodasInvitaciones] ${resultado.deletedCount} invitaciones eliminadas`);
     return res.status(200).json({ mensaje: `Se eliminaron ${resultado.deletedCount} invitaciones.` });
   } catch (error) {
-    console.error("💥 [eliminarTodasLasInvitaciones] Error:", error.message);
+    console.error("💥 [eliminarTodasInvitaciones] Error:", error.message);
     return res.status(500).json({ mensaje: "Error interno al eliminar las invitaciones." });
   }
 };
@@ -345,5 +339,5 @@ module.exports = {
   cancelarInvitacionPorSuperAdmin,
   listarInvitacionesRol,
   verificarInvitacionPendiente: rolPendiente,
-  eliminarTodasInvitaciones , 
+  eliminarTodasInvitaciones
 };
