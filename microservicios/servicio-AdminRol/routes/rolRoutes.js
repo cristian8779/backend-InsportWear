@@ -1,4 +1,3 @@
-// routes/rolRoutes.js
 const express = require("express");
 const router = express.Router();
 
@@ -7,7 +6,9 @@ const {
   invitarCambioRol,
   confirmarCodigoRol,
   verificarInvitacionPendiente,
-  rechazarInvitacionRol
+  rechazarInvitacionRol,
+  listarInvitacionesRol,
+  eliminarTodasInvitaciones // 👈 nuevo controlador
 } = require("../controllers/rolController");
 
 // Middlewares
@@ -18,7 +19,6 @@ const limitarInvitacionPendiente = require("../middlewares/limitarInvitacionPend
 
 /**
  * ✅ Ruta para enviar invitación de cambio de rol
- * POST /api/rol/invitar - Solo un SuperAdmin puede enviarla
  */
 router.post(
   "/invitar",
@@ -37,7 +37,6 @@ router.post(
 
 /**
  * ✅ Ruta para confirmar el código de invitación
- * POST /api/rol/confirmar - El usuario debe estar logueado
  */
 router.post(
   "/confirmar",
@@ -52,8 +51,7 @@ router.post(
 );
 
 /**
- * ✅ Ruta para verificar si el usuario logueado tiene una invitación pendiente
- * GET /api/rol/pendiente
+ * ✅ Ruta para verificar invitación pendiente
  */
 router.get(
   "/pendiente",
@@ -67,8 +65,7 @@ router.get(
 );
 
 /**
- * ✅ Ruta para rechazar una invitación
- * POST /api/rol/rechazar - El usuario logueado puede cancelar su invitación pendiente
+ * ✅ Ruta para rechazar invitación
  */
 router.post(
   "/rechazar",
@@ -80,6 +77,44 @@ router.post(
   },
   verificarToken,
   rechazarInvitacionRol
+);
+
+/**
+ * ✅ Ruta para listar invitaciones
+ */
+router.get(
+  "/invitaciones",
+  (req, res, next) => {
+    console.log("📜 [GET] /api/rol/invitaciones");
+    console.log("🔹 Headers:", req.headers);
+    next();
+  },
+  verificarToken,
+  esSuperAdmin,
+  listarInvitacionesRol
+);
+
+/**
+ * 🚨 Ruta para eliminar TODAS las invitaciones (solo SuperAdmin con confirmación)
+ * DELETE /api/rol/invitaciones
+ */
+router.delete(
+  "/invitaciones",
+  (req, res, next) => {
+    console.log("⚠️ [DELETE] /api/rol/invitaciones");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+
+    if (req.body.confirmacion !== "ELIMINAR TODO") {
+      return res.status(400).json({
+        error: "Debes enviar { confirmacion: 'ELIMINAR TODO' } para continuar"
+      });
+    }
+    next();
+  },
+  verificarToken,
+  esSuperAdmin,
+  eliminarTodasInvitaciones
 );
 
 module.exports = router;

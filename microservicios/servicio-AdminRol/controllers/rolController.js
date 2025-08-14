@@ -5,7 +5,7 @@ const axios = require("axios");
 const jwt = require("jsonwebtoken"); // ⬅️ para extraer datos del token si falta req.usuario
 
 const AUTH_URL = process.env.AUTH_URL;
-const JWT_SECRET = process.env.JWT_SECRET 
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // 🔧 Obtener usuario externo por email
 const getUsuarioPorEmail = async (email) => {
@@ -47,10 +47,30 @@ const invitarCambioRol = async (req, res) => {
       return res.status(400).json({ mensaje: "Rol inválido. Solo se permite 'admin' o 'superAdmin'." });
     }
 
-    // ✅ CORREGIDO: Usar req.usuario en lugar de verificación manual
+    // ✅ Solo el SuperAdmin puede invitar
     if (!req.usuario || req.usuario.rol !== "superAdmin") {
       console.warn("🚫 [invitarCambioRol] Usuario no autorizado");
       return res.status(403).json({ mensaje: "Solo el SuperAdmin puede enviar invitaciones de cambio de rol." });
+    }
+
+    // 🚫 Verificar límite de superAdmin y admin existentes
+    try {
+      const { data } = await axios.get(`${AUTH_URL}/usuarios`, { timeout: 4000 });
+      const usuarios = data?.usuarios || [];
+
+      const totalSuperAdmins = usuarios.filter(u => u.rol === "superAdmin").length;
+      const totalAdmins = usuarios.filter(u => u.rol === "admin").length;
+
+      if (nuevoRol === "superAdmin" && totalSuperAdmins >= 2) {
+        return res.status(400).json({ mensaje: "No se pueden crear más de 2 superAdmin." });
+      }
+
+      if (nuevoRol === "admin" && totalAdmins >= 5) {
+        return res.status(400).json({ mensaje: "No se pueden crear más de 5 admin." });
+      }
+    } catch (error) {
+      console.error("❌ [invitarCambioRol] Error al verificar límites de roles:", error.message);
+      return res.status(500).json({ mensaje: "No se pudo verificar la cantidad de roles actuales." });
     }
 
     const credencial = await getUsuarioPorEmail(email);
@@ -98,13 +118,11 @@ const confirmarCodigoRol = async (req, res) => {
   console.log("🔑 [confirmarCodigoRol] Body recibido:", req.body);
 
   try {
-    // ✅ CORREGIDO: Verificar que req.usuario existe (debería estar disponible por el middleware verificarToken)
     if (!req.usuario) {
-      console.error("🚫 [confirmarCodigoRol] req.usuario no está definido. Verifica que el middleware verificarToken esté funcionando.");
+      console.error("🚫 [confirmarCodigoRol] req.usuario no está definido.");
       return res.status(401).json({ mensaje: "Usuario no autenticado. Verifica tu token." });
     }
 
-    // ✅ CORREGIDO: Ahora req.usuario.email debería estar disponible
     if (!req.usuario.email) {
       console.error("🚫 [confirmarCodigoRol] El token no contiene email");
       return res.status(400).json({ mensaje: "Token inválido: falta email." });
@@ -145,14 +163,12 @@ const confirmarCodigoRol = async (req, res) => {
 
     try {
       console.log(`🔄 [confirmarCodigoRol] Actualizando rol a ${solicitud.nuevoRol}`);
-      
-      // ✅ CORREGIDO: Incluir parámetro esConfirmacionInvitacion
       await axios.put(
         `${AUTH_URL}/usuarios/rol`,
         { 
           email: sanitizedEmail, 
           nuevoRol: solicitud.nuevoRol,
-          esConfirmacionInvitacion: true // ✅ PARÁMETRO CLAVE
+          esConfirmacionInvitacion: true
         },
         { 
           timeout: 5000, 
@@ -162,15 +178,9 @@ const confirmarCodigoRol = async (req, res) => {
           } 
         }
       );
-      
-      console.log(`✅ [confirmarCodigoRol] Rol actualizado correctamente en el servicio de autenticación`);
-      
+      console.log(`✅ [confirmarCodigoRol] Rol actualizado correctamente`);
     } catch (error) {
       console.error("⚠️ [confirmarCodigoRol] Error al actualizar el rol:");
-      console.error("   - Status:", error.response?.status);
-      console.error("   - Data:", error.response?.data);
-      console.error("   - Message:", error.message);
-      
       return res.status(502).json({ 
         mensaje: "No se pudo confirmar el cambio de rol en el servicio de autenticación.",
         detalle: error.response?.data?.mensaje || "Error de comunicación"
@@ -192,7 +202,6 @@ const confirmarCodigoRol = async (req, res) => {
 const rechazarInvitacionRol = async (req, res) => {
   console.log("🚫 [rechazarInvitacionRol] Body/Headers:", { body: req.body, headers: req.headers });
   try {
-    // ✅ CORREGIDO: Verificación simplificada
     if (!req.usuario?.email) {
       console.warn("🚫 [rechazarInvitacionRol] Usuario no autenticado o sin email");
       return res.status(401).json({ mensaje: "Debes estar autenticado." });
@@ -218,7 +227,6 @@ const rechazarInvitacionRol = async (req, res) => {
 const cancelarInvitacionPorSuperAdmin = async (req, res) => {
   console.log("🛑 [cancelarInvitacionPorSuperAdmin] Params:", req.params);
   try {
-    // ✅ CORREGIDO: Verificación simplificada
     if (!req.usuario || req.usuario.rol !== "superAdmin") {
       console.warn("🚫 [cancelarInvitacionPorSuperAdmin] No autorizado");
       return res.status(403).json({ mensaje: "Solo el SuperAdmin puede cancelar invitaciones." });
@@ -250,7 +258,6 @@ const cancelarInvitacionPorSuperAdmin = async (req, res) => {
 const listarInvitacionesRol = async (req, res) => {
   console.log("📜 [listarInvitacionesRol] Solicitud recibida");
   try {
-    // ✅ CORREGIDO: Verificación simplificada
     if (!req.usuario || req.usuario.rol !== "superAdmin") {
       console.warn("🚫 [listarInvitacionesRol] No autorizado");
       return res.status(403).json({ mensaje: "Solo el SuperAdmin puede ver las invitaciones." });
@@ -277,7 +284,6 @@ const listarInvitacionesRol = async (req, res) => {
 const rolPendiente = async (req, res) => {
   console.log("⏳ [rolPendiente] Verificando invitación pendiente");
   try {
-    // ✅ CORREGIDO: Verificación simplificada
     if (!req.usuario?.email) {
       console.warn("🚫 [rolPendiente] Usuario no autenticado o sin email");
       return res.status(401).json({ pendiente: false, mensaje: "Debes estar autenticado." });
@@ -307,6 +313,31 @@ const rolPendiente = async (req, res) => {
   }
 };
 
+// ✅ Eliminar TODAS las invitaciones (SuperAdmin + Confirmación de seguridad)
+const eliminarTodasInvitaciones  = async (req, res) => {
+  console.log("⚠️ [eliminarTodasLasInvitaciones] Solicitud recibida");
+
+  try {
+    if (!req.usuario || req.usuario.rol !== "superAdmin") {
+      console.warn("🚫 [eliminarTodasLasInvitaciones] No autorizado");
+      return res.status(403).json({ mensaje: "Solo el SuperAdmin puede eliminar todas las invitaciones." });
+    }
+
+    const confirmacion = req.body?.confirmacion;
+    if (confirmacion !== "ELIMINAR TODO") {
+      console.warn("⚠️ [eliminarTodasLasInvitaciones] Confirmación inválida");
+      return res.status(400).json({ mensaje: "Debes escribir exactamente 'ELIMINAR TODO' para confirmar." });
+    }
+
+    const resultado = await RolRequest.deleteMany({});
+    console.log(`🗑️ [eliminarTodasLasInvitaciones] ${resultado.deletedCount} invitaciones eliminadas`);
+    return res.status(200).json({ mensaje: `Se eliminaron ${resultado.deletedCount} invitaciones.` });
+  } catch (error) {
+    console.error("💥 [eliminarTodasLasInvitaciones] Error:", error.message);
+    return res.status(500).json({ mensaje: "Error interno al eliminar las invitaciones." });
+  }
+};
+
 module.exports = {
   invitarCambioRol,
   confirmarCodigoRol,
@@ -314,4 +345,5 @@ module.exports = {
   cancelarInvitacionPorSuperAdmin,
   listarInvitacionesRol,
   verificarInvitacionPendiente: rolPendiente,
+  eliminarTodasInvitaciones , 
 };
