@@ -66,13 +66,14 @@ const crearUsuario = async (req, res) => {
     }
 
     const nuevoUsuario = new Usuario({
-      nombre: nombre.trim(),
-      direccion: direccion?.trim() || "",
-      telefono: telefono?.trim() || "",
-      imagenPerfil: req.file?.path || "",
-      public_id: req.file?.filename || "",
-      credenciales: credenciales.trim(),
-    });
+  nombre: nombre.trim(),
+  direccion: direccion?.trim() || "",
+  telefono: telefono?.trim() || "",
+  imagenPerfil: req.file?.path || req.body.imagenPerfil || "",
+  public_id: req.file?.filename || "",
+  credenciales: credenciales.trim(),
+});
+
 
     // Intentar guardar en la base de datos
     await nuevoUsuario.save();
