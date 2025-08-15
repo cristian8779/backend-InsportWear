@@ -12,6 +12,15 @@ const {
   eliminarTodasInvitaciones
 } = require("../controllers/rolController");
 
+// 📌 Importar controladores de SuperAdmin
+const {
+  transferirSuperAdmin,
+  confirmarTransferencia,
+  rechazarTransferencia,
+  verificarTransferenciaPendiente
+} = require("../controllers/transferenciaSuperAdminController");
+
+
 // Middlewares
 const verificarToken = require("../middlewares/verificarToken");
 const esSuperAdmin = require("../middlewares/esSuperAdmin");
@@ -138,6 +147,62 @@ router.delete(
   verificarToken,
   esSuperAdmin,
   eliminarTodasInvitaciones
+);
+
+/* =========================
+   📌 RUTAS DE SUPERADMIN
+   ========================= */
+
+// Iniciar transferencia de SuperAdmin
+router.post(
+  "/superadmin/transferir",
+  (req, res, next) => {
+    console.log("👑 [POST] /api/rol/superadmin/transferir");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
+  verificarToken,
+  esSuperAdmin,
+  transferirSuperAdmin
+);
+
+// Confirmar transferencia
+router.post(
+  "/superadmin/confirmar",
+  (req, res, next) => {
+    console.log("✅ [POST] /api/rol/superadmin/confirmar");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
+  verificarToken,
+  confirmarTransferencia
+);
+
+// Rechazar transferencia
+router.post(
+  "/superadmin/rechazar",
+  (req, res, next) => {
+    console.log("🚫 [POST] /api/rol/superadmin/rechazar");
+    console.log("🔹 Headers:", req.headers);
+    console.log("🔹 Body recibido:", req.body);
+    next();
+  },
+  verificarToken,
+  rechazarTransferencia
+);
+
+// Verificar si hay transferencia pendiente
+router.get(
+  "/superadmin/pendiente",
+  (req, res, next) => {
+    console.log("⏳ [GET] /api/rol/superadmin/pendiente");
+    console.log("🔹 Headers:", req.headers);
+    next();
+  },
+  verificarToken,
+  verificarTransferenciaPendiente
 );
 
 module.exports = router;

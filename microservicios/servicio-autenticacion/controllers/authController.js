@@ -83,22 +83,23 @@ const registrar = async (req, res) => {
       console.warn("⚠️ Error al enviar correo de bienvenida:", error.message);
     }
 
-    // ✅ CORREGIDO: Incluir email en el token
+    // ✅ Incluir nombre y email en el token
     const accessToken = jwt.sign(
       { 
         id: usuarioCreado._id, 
-        email: emailLimpio, // ✅ Agregar email
+        nombre: usuarioCreado.nombre, // ✅ Agregar nombre
+        email: emailLimpio, 
         rol: nuevaCredencial.rol 
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // ✅ CORREGIDO: Incluir email en el refresh token
     const refreshToken = jwt.sign(
       { 
         id: usuarioCreado._id, 
-        email: emailLimpio, // ✅ Agregar email
+        nombre: usuarioCreado.nombre, // ✅ Agregar nombre
+        email: emailLimpio, 
         rol: nuevaCredencial.rol 
       },
       process.env.JWT_REFRESH_SECRET,
@@ -162,22 +163,23 @@ const login = async (req, res) => {
       });
     }
 
-    // ✅ CORREGIDO: Incluir email en el token
+    // ✅ Incluir nombre y email en el token
     const accessToken = jwt.sign(
       { 
         id: usuario._id, 
-        email: credencial.email, // ✅ Agregar email
+        nombre: usuario.nombre, // ✅ Agregar nombre
+        email: credencial.email, 
         rol: credencial.rol 
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // ✅ CORREGIDO: Incluir email en el refresh token
     const refreshToken = jwt.sign(
       { 
         id: usuario._id, 
-        email: credencial.email, // ✅ Agregar email
+        nombre: usuario.nombre, // ✅ Agregar nombre
+        email: credencial.email, 
         rol: credencial.rol 
       },
       process.env.JWT_REFRESH_SECRET,
@@ -223,11 +225,12 @@ const renovarToken = async (req, res) => {
       });
     }
 
-    // ✅ CORREGIDO: Mantener email en el nuevo token
+    // ✅ Mantener nombre y email en el nuevo token
     const nuevoAccessToken = jwt.sign(
       { 
         id: decoded.id, 
-        email: decoded.email, // ✅ Mantener email del token anterior
+        nombre: decoded.nombre, // ✅ Mantener nombre
+        email: decoded.email, 
         rol: decoded.rol 
       },
       process.env.JWT_SECRET,
@@ -258,7 +261,7 @@ const verificarToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log(`✅ [verificarToken] Token verificado. Payload:`, decoded);
     
-    req.usuario = decoded; // Ahora incluirá id, email y rol
+    req.usuario = decoded; // Ahora incluirá id, nombre, email y rol
     next();
   } catch (err) {
     console.error(`🚫 [verificarToken] Error:`, err.message);

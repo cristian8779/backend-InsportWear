@@ -23,6 +23,11 @@ const {
   cambiarRolUsuarioPorCorreo
 } = require('../controllers/cambiarRolUsuarioPorCorreo'); // <== Asegúrate que la ruta sea correcta
 
+// ✅ Nuevo controlador para transferencia de SuperAdmin
+const {
+  transferirSuperAdmin
+} = require('../controllers/transferenciaSuperAdmin'); // <== Asegúrate que el archivo exista y el nombre coincida
+
 const router = express.Router();
 
 // --------------------------
@@ -57,6 +62,9 @@ router.get('/usuarios/:email', obtenerUsuarioPorEmail);
 
 // ✅ NUEVA ruta: Cambiar rol usando nuevo controller
 router.put('/usuarios/rol', verificarToken, cambiarRolUsuarioPorCorreo);
+
+// ✅ NUEVA ruta: Transferencia de SuperAdmin
+router.put('/usuarios/transferencia-superadmin', verificarToken, transferirSuperAdmin);
 
 // --------------------------
 // 🔐 Rutas internas (solo accesibles con token válido)

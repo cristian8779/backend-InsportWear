@@ -2,14 +2,14 @@ const mongoose = require("mongoose");
 
 const RolRequestSchema = new mongoose.Schema(
   {
-    email: { type: String, required: true },
+    email: { type: String, required: true }, // destinatario
     nuevoRol: {
       type: String,
-      enum: ["admin", "superAdmin"], // Asegúrate que coincide con los que manejas en lógica
+      enum: ["admin", "superAdmin"],
       required: true,
     },
     codigo: {
-      type: String, // Código de 6 dígitos enviado por correo
+      type: String,
       required: true,
     },
     expiracion: { type: Date, required: true },
@@ -17,6 +17,10 @@ const RolRequestSchema = new mongoose.Schema(
       type: String,
       enum: ["pendiente", "confirmado", "expirado", "cancelado"],
       default: "pendiente",
+    },
+    solicitante: { // ⬅️ Nuevo campo
+      type: String,
+      required: false, // lo podemos dejar opcional para compatibilidad
     },
   },
   { timestamps: true }
