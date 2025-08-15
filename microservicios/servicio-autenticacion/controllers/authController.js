@@ -62,6 +62,8 @@ const registrar = async (req, res) => {
       const respuesta = await axios.post(url, {
         nombre: nombre.trim(),
         credenciales: nuevaCredencial._id,
+        imagenPerfil: req.file?.path || req.body.imagenPerfil || "",
+
       });
 
       usuarioCreado = respuesta.data;
