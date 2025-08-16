@@ -139,10 +139,15 @@ const cambiarPasswordConCodigo = async (req, res) => {
     }
 
     // Validar seguridad de contraseña
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(nuevaPassword)) {
-      return res.status(400).json({ mensaje: "La nueva contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número." });
-    }
+  const passwordRegex = /^(?=.*[A-Z\d])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+
+if (!passwordRegex.test(password)) {
+  return res.status(400).json({
+    mensaje:
+      "La contraseña debe tener al menos 8 caracteres, una mayúscula o un número, y un símbolo especial.",
+  });
+}
+
 
     // Actualizar contraseña
     await axios.put(`${process.env.AUTH_SERVICE_URL}/api/auth/credencial/${usuario.credenciales}/password`, {

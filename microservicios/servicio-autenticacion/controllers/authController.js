@@ -26,12 +26,15 @@ const registrar = async (req, res) => {
       });
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({
-        mensaje: "La contraseña debe tener al menos 8 caracteres, una letra mayúscula, una letra minúscula y un número.",
-      });
-    }
+   const passwordRegex = /^(?=.*[A-Z\d])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+
+if (!passwordRegex.test(password)) {
+  return res.status(400).json({
+    mensaje:
+      "La contraseña debe tener al menos 8 caracteres, una mayúscula o un número, y un símbolo especial.",
+  });
+}
+
 
     if (rol === "superAdmin") {
       const yaHay = await Credenciales.findOne({ rol: "superAdmin" });
