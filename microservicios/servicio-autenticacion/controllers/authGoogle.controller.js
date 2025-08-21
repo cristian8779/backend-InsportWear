@@ -55,8 +55,8 @@ const loginGoogle = async (req, res) => {
 
       // Buscar usuario en el microservicio por ID de credenciales
       const respuesta = await axios.get(
-    `${process.env.USUARIO_SERVICE_URL}/api/usuario/credencial/${credencial._id}`
-   );
+        `${process.env.USUARIO_SERVICE_URL}/api/usuario/credencial/${credencial._id}`
+      );
 
       usuario = respuesta.data;
     } else {
@@ -87,16 +87,37 @@ const loginGoogle = async (req, res) => {
       });
     }
 
-    // Firmar token JWT
-    const token = jwt.sign(
-        { id: credencial._id, rol: credencial.rol, email: credencial.email },
+    // 🔹 Firmar tokens igual que en registrar/login
+    const accessToken = jwt.sign(
+      {
+        id: usuario._id, // usar ID del perfil
+        nombre: usuario.nombre,
+        email: credencial.email,
+        rol: credencial.rol,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    const refreshToken = jwt.sign(
+      {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: credencial.email,
+        rol: credencial.rol,
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Guardar refreshToken en credencial
+    credencial.refreshToken = refreshToken;
+    await credencial.save();
+
     return res.json({
       mensaje: "Inicio de sesión exitoso con Google ✅",
-      token,
+      accessToken,
+      refreshToken,
       usuario: {
         nombre: usuario.nombre,
         email: credencial.email,
