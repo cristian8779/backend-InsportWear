@@ -3,7 +3,6 @@ const axios = require('axios');
 require('dotenv').config();
 const mongoose = require('mongoose');
 
-
 const PRODUCTO_SERVICE_URL = process.env.PRODUCTO_SERVICE_URL;
 
 // 🔍 Consultar producto en microservicio de productos
@@ -23,17 +22,41 @@ const obtenerProductoRemoto = async (productoId) => {
   }
 };
 
-// 📦 Obtener carrito completo
+// 📦 Obtener carrito completo (ENRIQUECIDO)
 const obtenerCarrito = async (req, res) => {
   try {
     const userId = req.user._id;
     const carrito = await Carrito.findOne({ usuarioId: userId });
 
     if (!carrito || carrito.productos.length === 0) {
-      return res.status(200).json({ mensaje: 'Tu carrito está vacío por ahora. ¡Agrega algo que te guste!', carrito: null });
+      return res.status(200).json({ mensaje: 'Tu carrito está vacío por ahora. ¡Agrega algo que te guste!', carrito: [] });
     }
 
-    res.json(carrito);
+    const productosEnriquecidos = [];
+    for (const item of carrito.productos) {
+      const producto = await obtenerProductoRemoto(item.productoId);
+      if (!producto) continue;
+
+      let variacion = null;
+      if (item.variacionId) {
+        variacion = producto.variaciones?.find(v => String(v._id) === String(item.variacionId));
+      }
+
+      productosEnriquecidos.push({
+        productoId: item.productoId,
+        variacionId: item.variacionId,
+        cantidad: item.cantidad,
+        precio: variacion ? variacion.precio : producto.precio,
+        nombre: producto.nombre,
+        imagen: variacion?.imagen || producto.imagen,
+        atributos: item.atributos,
+        subtotal: (variacion ? variacion.precio : producto.precio) * item.cantidad
+      });
+    }
+
+    const total = productosEnriquecidos.reduce((acc, p) => acc + p.subtotal, 0);
+
+    res.json({ productos: productosEnriquecidos, total });
   } catch (err) {
     console.error('❌ Error al obtener el carrito:', err);
     res.status(500).json({ mensaje: 'Tuvimos un problema al cargar tu carrito. Intentá nuevamente más tarde.' });
@@ -164,7 +187,7 @@ const eliminarDelCarrito = async (req, res) => {
 
 
 
-// 🧾 Resumen del carrito
+// 🧾 Resumen del carrito (ENRIQUECIDO)
 const obtenerResumenCarrito = async (req, res) => {
   try {
     const userId = req.params.userId || req.user?._id;
@@ -175,14 +198,29 @@ const obtenerResumenCarrito = async (req, res) => {
       return res.status(200).json({ mensaje: 'Tu carrito está vacío.', productos: [], total: 0 });
     }
 
-    const resumen = carrito.productos.map(item => ({
-      productoId: item.productoId,
-      variacionId: item.variacionId,
-      cantidad: item.cantidad,
-      precio: item.precio,
-      atributos: item.atributos,
-      subtotal: item.precio * item.cantidad
-    }));
+    const resumen = [];
+    for (const item of carrito.productos) {
+      const producto = await obtenerProductoRemoto(item.productoId);
+      if (!producto) continue;
+
+      let variacion = null;
+      if (item.variacionId) {
+        variacion = producto.variaciones?.find(v => String(v._id) === String(item.variacionId));
+      }
+
+      const precio = variacion ? variacion.precio : producto.precio;
+
+      resumen.push({
+        productoId: item.productoId,
+        variacionId: item.variacionId,
+        nombre: producto.nombre,
+        cantidad: item.cantidad,
+        precio,
+        imagen: variacion?.imagen || producto.imagen,
+        atributos: item.atributos,
+        subtotal: precio * item.cantidad
+      });
+    }
 
     const total = resumen.reduce((acc, p) => acc + p.subtotal, 0);
     res.status(200).json({ productos: resumen, total });
