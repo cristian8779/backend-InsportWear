@@ -468,7 +468,7 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-// 🗑️ Eliminar un producto (mejorado con limpieza de carritos)
+// 🗑️ Eliminar un producto (mejorado con limpieza de carritos y favoritos)
 const eliminarProducto = async (req, res) => {
     try {
         if (!['admin', 'superAdmin'].includes(req.usuario.rol)) {
@@ -489,7 +489,6 @@ const eliminarProducto = async (req, res) => {
                     await cloudinary.uploader.destroy(variacion.imagen.public_id);
                     console.log(`   - 🗑️ Imagen de variación eliminada: ${variacion.imagen.public_id}`);
                 }
-                // Mantener compatibilidad con el modelo anterior por si acaso
                 if (variacion.imagenes?.length) {
                     for (const img of variacion.imagenes) {
                         if (img.public_id) {
@@ -511,38 +510,55 @@ const eliminarProducto = async (req, res) => {
         // 🗑 Eliminar el producto de la base de datos
         await Producto.findByIdAndDelete(id);
 
-        // 🔗 Notificar al microservicio de carrito para removerlo globalmente
+        // 🔗 Notificar al microservicio de carrito
         if (process.env.CARRITO_SERVICE_URL) {
             try {
                 const carritoResp = await axios.delete(
                     `${process.env.CARRITO_SERVICE_URL}/api/carrito/eliminar-producto-global/${id}`,
                     { 
                         timeout: 5000,
-                        headers: {
-                            'x-api-key': process.env.MICROSERVICIO_API_KEY
-                        }
+                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
                     }
                 );
-                console.log(`🛒 Producto eliminado de ${carritoResp.data?.resultado?.modifiedCount || 0} carritos: ${carritoResp.status} - ${carritoResp.data?.mensaje || 'OK'}`);
+                console.log(`🛒 Producto eliminado de ${carritoResp.data?.resultado?.modifiedCount || 0} carritos: ${carritoResp.data?.mensaje || 'OK'}`);
             } catch (err) {
                 console.warn(`⚠️ No se pudo eliminar el producto ${id} de los carritos: ${err.message}`);
             }
         } else {
-            console.warn("⚠️ CARRITO_SERVICE_URL no está configurada, no se notificará al servicio de carrito.");
+            console.warn("⚠️ CARRITO_SERVICE_URL no está configurada.");
+        }
+
+        // 🔗 Notificar al microservicio de favoritos
+        if (process.env.FAVORITOS_SERVICE_URL) {
+            try {
+                const favResp = await axios.delete(
+                    `${process.env.FAVORITOS_SERVICE_URL}/api/favoritos/producto/${id}`,
+                    { 
+                        timeout: 5000,
+                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
+                    }
+                );
+                console.log(`⭐ Producto eliminado de favoritos: ${favResp.data?.mensaje || 'OK'}`);
+            } catch (err) {
+                console.warn(`⚠️ No se pudo eliminar el producto ${id} de favoritos: ${err.message}`);
+            }
+        } else {
+            console.warn("⚠️ FAVORITOS_SERVICE_URL no está configurada.");
         }
 
         // 🧹 Limpiar caché
         await redisClient.del('productos_todos');
-        await redisClient.del('filtros_productos'); // Limpiar también caché de filtros
+        await redisClient.del('filtros_productos');
 
-        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes y carritos).`);
-        res.json({ mensaje: '✅ Producto eliminado y quitado de todos los carritos.' });
+        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes, carritos y favoritos).`);
+        res.json({ mensaje: '✅ Producto eliminado y quitado de carritos y favoritos.' });
 
     } catch (error) {
         console.error("❌ Error en eliminarProducto:", error);
         res.status(500).json({ mensaje: '❌ Error al eliminar el producto.', error: error.message });
     }
 };
+
 
 // 🔄 Cambiar estado del producto (corregido)
 const cambiarEstadoProducto = async (req, res) => {

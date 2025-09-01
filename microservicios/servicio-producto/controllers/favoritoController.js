@@ -36,16 +36,19 @@ const agregarFavorito = async (req, res) => {
 // Obtener favoritos del usuario con info del producto
 const obtenerFavoritos = async (req, res) => {
   try {
-    const favoritos = await Favorito.find({ usuario: req.usuario._id }).populate({
+    let favoritos = await Favorito.find({ usuario: req.usuario._id }).populate({
       path: 'producto',
       select: 'nombre descripcion precio imagen categoria'
     });
 
-    if (favoritos.length === 0) {
+    // 🔥 Filtrar los que tengan producto válido
+    const favoritosValidos = favoritos.filter(fav => fav.producto !== null);
+
+    if (favoritosValidos.length === 0) {
       return res.json({ mensaje: 'Aún no tienes productos guardados en favoritos.', favoritos: [] });
     }
 
-    res.json({ mensaje: '✅ Lista de tus productos favoritos', favoritos });
+    res.json({ mensaje: '✅ Lista de tus productos favoritos', favoritos: favoritosValidos });
   } catch (error) {
     console.error("❌ Error al obtener favoritos:", error);
     res.status(500).json({
@@ -80,8 +83,33 @@ const eliminarFavorito = async (req, res) => {
   }
 };
 
+// Eliminar TODOS los favoritos que contienen un producto (cuando se borra del catálogo)
+const eliminarFavoritosPorProducto = async (req, res) => {
+  try {
+    const { productoId } = req.params;
+
+    const resultado = await Favorito.deleteMany({ producto: productoId });
+
+    if (resultado.deletedCount === 0) {
+      return res.status(404).json({ mensaje: 'Este producto no estaba en ninguna lista de favoritos.' });
+    }
+
+    res.json({
+      mensaje: `🗑️ Producto eliminado de ${resultado.deletedCount} favoritos con éxito.`,
+    });
+  } catch (error) {
+    console.error("❌ Error al eliminar favoritos por producto:", error);
+    res.status(500).json({
+      mensaje: 'Ocurrió un error al intentar eliminar el producto de favoritos.',
+      error: error.message
+    });
+  }
+};
+
+
 module.exports = {
   agregarFavorito,
   obtenerFavoritos,
-  eliminarFavorito
+  eliminarFavorito,
+  eliminarFavoritosPorProducto
 };
