@@ -33,6 +33,7 @@ const obtenerCarrito = async (req, res) => {
     }
 
     const productosEnriquecidos = [];
+
     for (const item of carrito.productos) {
       const producto = await obtenerProductoRemoto(item.productoId);
       if (!producto) continue;
@@ -40,22 +41,31 @@ const obtenerCarrito = async (req, res) => {
       let variacion = null;
       if (item.variacionId) {
         variacion = producto.variaciones?.find(v => String(v._id) === String(item.variacionId));
+        if (!variacion) {
+          console.warn(`⚠️ Variación ${item.variacionId} no encontrada en producto ${producto.nombre}`);
+        }
       }
+
+      // Precio preferentemente del remoto (o del item si prefieres el guardado)
+      const precioBase = variacion ? variacion.precio : producto.precio;
+
+      // Imagen: 1) la guardada en el item, 2) la de la variación, 3) la del producto
+      const imagenVariacion = variacion?.imagenes?.[0]?.url;
+      const imagen = item.imagen || imagenVariacion || producto.imagen;
 
       productosEnriquecidos.push({
         productoId: item.productoId,
         variacionId: item.variacionId,
         cantidad: item.cantidad,
-        precio: variacion ? variacion.precio : producto.precio,
+        precio: precioBase,
         nombre: producto.nombre,
-        imagen: variacion?.imagen || producto.imagen,
-        atributos: item.atributos,
-        subtotal: (variacion ? variacion.precio : producto.precio) * item.cantidad
+        imagen, // 👈 mostramos la que decidimos arriba
+        atributos: item.atributos || {},
+        subtotal: precioBase * item.cantidad
       });
     }
 
     const total = productosEnriquecidos.reduce((acc, p) => acc + p.subtotal, 0);
-
     res.json({ productos: productosEnriquecidos, total });
   } catch (err) {
     console.error('❌ Error al obtener el carrito:', err);
@@ -64,6 +74,9 @@ const obtenerCarrito = async (req, res) => {
 };
 
 
+
+
+// ➕ Agregar producto al carrito
 const agregarAlCarrito = async (req, res) => {
   const { productoId, variacionId, cantidad = 1 } = req.body;
 
@@ -74,27 +87,33 @@ const agregarAlCarrito = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Traer el producto del microservicio
     const producto = await obtenerProductoRemoto(productoId);
     if (!producto) {
       return res.status(404).json({ mensaje: 'Producto no encontrado.' });
     }
 
+    // Por defecto, precio/imagen del producto principal
     let precio = producto.precio;
+    let imagen = producto.imagen;
     let atributos = {};
 
-    // Si se mandó variacionId, buscarla
+    // Si viene variación, usar precio e imagen de la variación
     if (variacionId) {
       const variacion = producto.variaciones?.find(v => String(v._id) === String(variacionId));
       if (!variacion) {
         return res.status(404).json({ mensaje: 'Variación no encontrada.' });
       }
+
+      const imagenVariacion = variacion.imagenes?.[0]?.url; // 👈 O la que quieras elegir
       precio = variacion.precio;
+      imagen = imagenVariacion || producto.imagen;
+
       atributos = {
         color: variacion.color || {},
         tallaLetra: variacion.tallaLetra,
         tallaNumero: variacion.tallaNumero,
-        imagen: variacion.imagen
+        imagen: imagenVariacion || null,      // referenciamos la url usada
+        imagenes: variacion.imagenes || []    // opcional, por si te sirve guardarlas
       };
     }
 
@@ -103,7 +122,7 @@ const agregarAlCarrito = async (req, res) => {
       carrito = new Carrito({ usuarioId: userId, productos: [] });
     }
 
-    // Buscar si ya existe mismo producto + variación
+    // Misma combinación producto + variación => suma cantidades
     const index = carrito.productos.findIndex(p =>
       p.productoId.toString() === productoId &&
       String(p.variacionId || '') === String(variacionId || '')
@@ -111,24 +130,32 @@ const agregarAlCarrito = async (req, res) => {
 
     if (index >= 0) {
       carrito.productos[index].cantidad += cantidad;
+
+      // Opcional: mantener consistentes precio/imagen si cambian
+      carrito.productos[index].precio = precio;
+      carrito.productos[index].imagen = imagen;
+      carrito.productos[index].atributos = { ...(carrito.productos[index].atributos || {}), ...atributos };
     } else {
       carrito.productos.push({
         productoId,
         variacionId: variacionId || null,
         cantidad,
         precio,
+        imagen,     // 👈 guardamos la imagen elegida (variación > producto)
         atributos
       });
     }
 
     await carrito.save();
-    res.status(200).json({ mensaje: 'Producto agregado al carrito con éxito.', carrito });
+    console.log("✅ Carrito actualizado:", JSON.stringify(carrito, null, 2));
 
+    res.status(200).json({ mensaje: 'Producto agregado al carrito con éxito.', carrito });
   } catch (err) {
     console.error('❌ Error al agregar al carrito:', err);
     res.status(500).json({ mensaje: 'No pudimos agregar el producto. Probá de nuevo en unos minutos.' });
   }
 };
+
 
 
 // 🔁 Actualizar cantidad
@@ -199,6 +226,7 @@ const obtenerResumenCarrito = async (req, res) => {
     }
 
     const resumen = [];
+
     for (const item of carrito.productos) {
       const producto = await obtenerProductoRemoto(item.productoId);
       if (!producto) continue;
@@ -208,17 +236,21 @@ const obtenerResumenCarrito = async (req, res) => {
         variacion = producto.variaciones?.find(v => String(v._id) === String(item.variacionId));
       }
 
-      const precio = variacion ? variacion.precio : producto.precio;
+      const precioBase = variacion ? variacion.precio : producto.precio;
+
+      // Misma regla de imagen que en obtenerCarrito
+      const imagenVariacion = variacion?.imagenes?.[0]?.url;
+      const imagen = item.imagen || imagenVariacion || producto.imagen;
 
       resumen.push({
         productoId: item.productoId,
         variacionId: item.variacionId,
         nombre: producto.nombre,
         cantidad: item.cantidad,
-        precio,
-        imagen: variacion?.imagen || producto.imagen,
-        atributos: item.atributos,
-        subtotal: precio * item.cantidad
+        precio: precioBase,
+        imagen, // 👈 consistente
+        atributos: item.atributos || {},
+        subtotal: precioBase * item.cantidad
       });
     }
 
@@ -229,6 +261,7 @@ const obtenerResumenCarrito = async (req, res) => {
     res.status(500).json({ mensaje: 'No pudimos generar el resumen.' });
   }
 };
+
 
 
 // 🧹 Vaciar carrito
