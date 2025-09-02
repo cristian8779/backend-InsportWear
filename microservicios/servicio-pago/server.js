@@ -13,18 +13,37 @@ const PORT = process.env.PORT || 3007;
 // 🔌 Conexión a la base de datos
 conectarDB();
 
-// 🧱 Middlewares generales
+// 🧱 Middlewares generales - CORS actualizado para WebViews
 app.use(cors({
   origin: [
     'http://127.0.0.1:5500',
     'http://localhost:5500',
     'https://api.soportee.store',
-    'https://mellow-pasca-a7bd11.netlify.app', // ✅ Netlify incluido
+    'https://mellow-pasca-a7bd11.netlify.app',
+    null // ✅ CRÍTICO: Permite solicitudes desde WebViews (origin: null)
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, // ✅ Útil si en el futuro usas cookies o auth
+  credentials: true,
 }));
+
+// 🛡️ Middleware adicional para manejar preflight y WebViews
+app.use((req, res, next) => {
+  // Permite explícitamente el origen null para WebViews
+  if (req.headers.origin === null || req.headers.origin === 'null') {
+    res.header('Access-Control-Allow-Origin', 'null');
+  }
+  
+  // Manejo específico para solicitudes OPTIONS (preflight)
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Max-Age', '86400'); // 24 horas
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
 
 app.use(morgan('dev'));
 app.use(express.json());
