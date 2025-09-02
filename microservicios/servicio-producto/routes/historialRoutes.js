@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const historialController = require('../controllers/historialController');
 const { verificarToken } = require('../middlewares/authMiddleware'); // ✅ Importamos solo la función
+const historialCtrl = require('../controllers/historialController'); // Ajusta la ruta según tu proyecto
+
 
 // Protege todas las rutas con autenticación
 router.use(verificarToken);
