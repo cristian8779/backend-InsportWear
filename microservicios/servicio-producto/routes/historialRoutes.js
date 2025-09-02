@@ -8,6 +8,9 @@ router.use(verificarToken);
 
 // 👉 Agregar un producto al historial
 router.post('/', historialController.agregarAlHistorial);
+// 🔗 Eliminar un producto de todos los historiales (se usa desde microservicio de productos)
+router.delete("/producto/:id", historialCtrl.eliminarProductoDelHistorialGlobal);
+
 
 // 👉 Obtener historial agrupado por fecha (Hoy, Ayer, etc.)
 router.get('/', historialController.obtenerHistorialAgrupadoPorFecha);

@@ -394,7 +394,7 @@ const actualizarProducto = async (req, res) => {
         }
 
         const { id } = req.params;
-        const { nombre, descripcion, precio, categoria, subcategoria, stock, disponible } = req.body;
+        const { nombre, descripcion, precio, categoria, subcategoria, stock, disponible, estado } = req.body;
 
         let producto = await Producto.findById(id);
         if (!producto) {
@@ -424,6 +424,11 @@ const actualizarProducto = async (req, res) => {
         if (subcategoria && typeof subcategoria === 'string') actualizaciones.subcategoria = subcategoria.trim();
         if (stock !== undefined) actualizaciones.stock = stock;
         if (disponible !== undefined) actualizaciones.disponible = disponible;
+
+        // 👇 Validación de estado
+        if (estado && ['activo', 'inactivo'].includes(estado)) {
+            actualizaciones.estado = estado;
+        }
 
         // Actualizar imagen si se provee una nueva
         if (req.file) {
@@ -468,7 +473,8 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-// 🗑️ Eliminar un producto (mejorado con limpieza de carritos y favoritos)
+
+// 🗑️ Eliminar un producto (mejorado con limpieza de carritos, favoritos, anuncios e historial)
 const eliminarProducto = async (req, res) => {
     try {
         if (!['admin', 'superAdmin'].includes(req.usuario.rol)) {
@@ -510,6 +516,28 @@ const eliminarProducto = async (req, res) => {
         // 🗑 Eliminar el producto de la base de datos
         await Producto.findByIdAndDelete(id);
 
+        // 📜 Eliminar del historial (directo porque está en el mismo servicio)
+        const resultadoHistorial = await Historial.deleteMany({ producto: id });
+        console.log(`📜 Producto eliminado de ${resultadoHistorial.deletedCount} entradas del historial.`);
+
+        // 🔗 Notificar al microservicio de ANUNCIOS
+        if (process.env.ANUNCIO_SERVICE_URL) {
+            try {
+                const anuncioResp = await axios.delete(
+                    `${process.env.ANUNCIO_SERVICE_URL}/api/anuncios/producto/${id}`,
+                    { 
+                        timeout: 5000,
+                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
+                    }
+                );
+                console.log(`📢 Anuncios eliminados: ${anuncioResp.data?.mensaje || 'OK'}`);
+            } catch (err) {
+                console.warn(`⚠️ No se pudieron eliminar los anuncios del producto ${id}: ${err.message}`);
+            }
+        } else {
+            console.warn("⚠️ ANUNCIO_SERVICE_URL no está configurada.");
+        }
+
         // 🔗 Notificar al microservicio de carrito
         if (process.env.CARRITO_SERVICE_URL) {
             try {
@@ -550,14 +578,16 @@ const eliminarProducto = async (req, res) => {
         await redisClient.del('productos_todos');
         await redisClient.del('filtros_productos');
 
-        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes, carritos y favoritos).`);
-        res.json({ mensaje: '✅ Producto eliminado y quitado de carritos y favoritos.' });
+        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes, anuncios, carritos, favoritos e historial).`);
+        res.json({ mensaje: '✅ Producto eliminado y quitado de anuncios, carritos, favoritos e historial.' });
 
     } catch (error) {
         console.error("❌ Error en eliminarProducto:", error);
         res.status(500).json({ mensaje: '❌ Error al eliminar el producto.', error: error.message });
     }
 };
+
+
 
 
 // 🔄 Cambiar estado del producto (corregido)

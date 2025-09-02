@@ -106,9 +106,29 @@ const borrarHistorialCompleto = async (req, res) => {
   }
 };
 
+// 👉 Eliminar un producto de TODOS los historiales (cuando se elimina de la tienda)
+const eliminarProductoDelHistorialGlobal = async (req, res) => {
+  try {
+    const { id } = req.params; // id del producto
+    
+    const resultado = await Historial.deleteMany({ producto: id });
+
+    res.json({
+      mensaje: `🗑️ Producto ${id} eliminado de ${resultado.deletedCount} historiales.`,
+      resultado
+    });
+  } catch (error) {
+    console.error("Error al eliminar producto del historial global:", error);
+    res.status(500).json({ mensaje: "No se pudo eliminar el producto de los historiales.", error: error.message });
+  }
+};
+
+
+
 module.exports = {
   agregarAlHistorial,
   obtenerHistorialAgrupadoPorFecha,
   eliminarDelHistorial,
-  borrarHistorialCompleto
+  borrarHistorialCompleto,
+  eliminarProductoDelHistorialGlobal   
 };
