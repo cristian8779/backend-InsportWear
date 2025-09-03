@@ -336,6 +336,35 @@ const obtenerCategoriasDesdeServicio = async (req, res) => {
     }
 };
 
+// 🚨 Eliminar anuncios por productoId (para cuando se borra un producto)
+const eliminarAnunciosPorProducto = async (req, res) => {
+    try {
+        const { productoId } = req.params;
+
+        // Buscar anuncios relacionados
+        const anuncios = await Anuncio.find({ productoId });
+
+        // Eliminar imágenes en Cloudinary asociadas a esos anuncios
+        for (const anuncio of anuncios) {
+            if (anuncio.publicId) {
+                await limpiarImagenCloudinary(anuncio.publicId, "- eliminación masiva por producto");
+            }
+        }
+
+        // Eliminar anuncios en DB
+        await Anuncio.deleteMany({ productoId });
+
+        console.log(`✅ Se eliminaron los anuncios relacionados con el producto ${productoId}`);
+        res.json({ mensaje: `Se eliminaron ${anuncios.length} anuncios relacionados con el producto ${productoId}` });
+
+    } catch (error) {
+        console.error("❌ Error al eliminar anuncios por producto:", error);
+        res.status(500).json({ error: "No se pudieron eliminar los anuncios relacionados a este producto." });
+    }
+};
+
+
+
 module.exports = {
     obtenerActivos,
     obtenerTodos,
@@ -343,4 +372,5 @@ module.exports = {
     eliminarAnuncio,
     obtenerProductos: obtenerProductosDesdeServicio,
     obtenerCategorias: obtenerCategoriasDesdeServicio,
+    eliminarAnunciosPorProducto
 };

@@ -7,14 +7,13 @@ const CategoriaSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
-  descripcion: {
-    type: String,
-    required: true,
-    trim: true
-  },
   imagen: {
-    type: String, // URL de la imagen en Cloudinary
-    required: false // No es obligatorio al crear
+    type: String,
+    required: false
+  },
+  public_id: {
+    type: String,
+    required: false
   }
 }, {
   timestamps: true
