@@ -86,7 +86,6 @@ npm start
 ### `models/Categoria.js`
 - Esquema de Mongoose para categorías:
   - `nombre`
-  - `descripcion`
   - `fechaCreacion`
 
 ### `routes/categoria.routes.js`

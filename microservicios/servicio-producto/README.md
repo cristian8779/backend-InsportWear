@@ -103,6 +103,7 @@ npm start
 - `PUT /productos/:id` → Actualizar producto.
 - `DELETE /productos/:id` → Eliminar producto.
 - `GET /productos/buscar/:termino` → Buscar producto.
+- `GET /productos/filtros` → Buscar filtros.
 
 ---
 
@@ -116,7 +117,7 @@ npm start
 | PUT    | /productos/:id | Actualizar producto |
 | DELETE | /productos/:id | Eliminar producto |
 | GET    | /productos/buscar/:termino | Buscar producto |
-
+| GET    | /productos/filtros | Buscar filtros |
 ---
 
 ## 🛡 Seguridad

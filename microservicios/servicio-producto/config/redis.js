@@ -9,10 +9,11 @@ const redisClient = {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` }
     });
-    return res.json();
+    const data = await res.json();
+    return data.result || null; // 👈 devolvemos solo el valor crudo
   },
   async set(key, value, options = {}) {
-    let url = `${urlBase}/set/${key}/${value}`;
+    let url = `${urlBase}/set/${key}/${encodeURIComponent(value)}`;
     if (options.EX) url += `?EX=${options.EX}`;
     const res = await fetch(url, {
       method: 'POST',

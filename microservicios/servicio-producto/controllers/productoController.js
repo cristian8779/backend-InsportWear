@@ -121,119 +121,173 @@ const crearProducto = async (req, res) => {
     }
 };
 
-// 🎯 Función auxiliar para generar filtros dinámicos
+// 🎯 Función auxiliar mejorada para generar filtros dinámicos
 const generarFiltrosDinamicos = (productos) => {
-    const subcategoriasSet = new Set();
-    const tallasLetraSet = new Set();
-    const tallasNumeroSet = new Set();
-    const coloresMap = new Map(); // Para evitar duplicados por hex
-    let minPrecio = Infinity;
-    let maxPrecio = -Infinity;
-    let minPrecioVariacion = Infinity;
-    let maxPrecioVariacion = -Infinity;
+    try {
+        const subcategoriasSet = new Set();
+        const tallasLetraSet = new Set();
+        const tallasNumeroSet = new Set();
+        const coloresMap = new Map(); // Para evitar duplicados por hex
+        let minPrecio = Infinity;
+        let maxPrecio = -Infinity;
+        let minPrecioVariacion = Infinity;
+        let maxPrecioVariacion = -Infinity;
 
-    productos.forEach(producto => {
-        // Subcategorías
-        if (producto.subcategoria) {
-            subcategoriasSet.add(producto.subcategoria);
+        if (!Array.isArray(productos)) {
+            console.warn('⚠️ Productos no es un array, devolviendo filtros vacíos');
+            return {
+                subcategorias: [],
+                tallasLetra: [],
+                tallasNumero: [],
+                colores: [],
+                rangoPrecio: { min: 0, max: 0 },
+                rangoPrecioVariaciones: { min: 0, max: 0 }
+            };
         }
 
-        // Precios del producto principal
-        if (producto.precio < minPrecio) minPrecio = producto.precio;
-        if (producto.precio > maxPrecio) maxPrecio = producto.precio;
+        productos.forEach(producto => {
+            // Validar que el producto tenga las propiedades necesarias
+            if (!producto || typeof producto !== 'object') return;
 
-        // Filtros de variaciones
-        if (producto.variaciones && producto.variaciones.length > 0) {
-            producto.variaciones.forEach(variacion => {
-                // Tallas letra
-                if (variacion.tallaLetra) {
-                    tallasLetraSet.add(variacion.tallaLetra);
-                }
+            // Subcategorías
+            if (producto.subcategoria && typeof producto.subcategoria === 'string') {
+                subcategoriasSet.add(producto.subcategoria);
+            }
 
-                // Tallas número
-                if (variacion.tallaNumero) {
-                    tallasNumeroSet.add(variacion.tallaNumero);
-                }
+            // Precios del producto principal
+            if (typeof producto.precio === 'number' && !isNaN(producto.precio)) {
+                if (producto.precio < minPrecio) minPrecio = producto.precio;
+                if (producto.precio > maxPrecio) maxPrecio = producto.precio;
+            }
 
-                // Colores (usar hex como clave única)
-                if (variacion.color && variacion.color.hex && variacion.color.nombre) {
-                    const hex = variacion.color.hex.toLowerCase();
-                    if (!coloresMap.has(hex)) {
-                        coloresMap.set(hex, {
-                            nombre: variacion.color.nombre,
-                            hex: variacion.color.hex
-                        });
+            // Filtros de variaciones
+            if (Array.isArray(producto.variaciones) && producto.variaciones.length > 0) {
+                producto.variaciones.forEach(variacion => {
+                    if (!variacion || typeof variacion !== 'object') return;
+
+                    // Tallas letra
+                    if (variacion.tallaLetra && typeof variacion.tallaLetra === 'string') {
+                        tallasLetraSet.add(variacion.tallaLetra);
                     }
-                }
 
-                // Precios de variaciones
-                if (variacion.precio !== undefined) {
-                    if (variacion.precio < minPrecioVariacion) minPrecioVariacion = variacion.precio;
-                    if (variacion.precio > maxPrecioVariacion) maxPrecioVariacion = variacion.precio;
-                }
+                    // Tallas número
+                    if (variacion.tallaNumero && typeof variacion.tallaNumero === 'string') {
+                        tallasNumeroSet.add(variacion.tallaNumero);
+                    }
+
+                    // Colores (usar hex como clave única)
+                    if (variacion.color && 
+                        typeof variacion.color === 'object' && 
+                        variacion.color.hex && 
+                        variacion.color.nombre &&
+                        typeof variacion.color.hex === 'string' &&
+                        typeof variacion.color.nombre === 'string') {
+                        
+                        const hex = variacion.color.hex.toLowerCase();
+                        if (!coloresMap.has(hex)) {
+                            coloresMap.set(hex, {
+                                nombre: variacion.color.nombre,
+                                hex: variacion.color.hex
+                            });
+                        }
+                    }
+
+                    // Precios de variaciones
+                    if (typeof variacion.precio === 'number' && !isNaN(variacion.precio)) {
+                        if (variacion.precio < minPrecioVariacion) minPrecioVariacion = variacion.precio;
+                        if (variacion.precio > maxPrecioVariacion) maxPrecioVariacion = variacion.precio;
+                    }
+                });
+            }
+        });
+
+        // Convertir sets a arrays ordenados con validación
+        const tallasLetraOrdenadas = Array.from(tallasLetraSet)
+            .filter(talla => typeof talla === 'string')
+            .sort((a, b) => {
+                const orden = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+                return orden.indexOf(a) - orden.indexOf(b);
             });
+
+        const tallasNumeroOrdenadas = Array.from(tallasNumeroSet)
+            .map(talla => String(talla)) // Convertir a string
+            .filter(talla => talla && !isNaN(Number(talla))) // Filtrar valores válidos
+            .map(talla => Number(talla)) // Convertir a número para ordenar
+            .sort((a, b) => a - b)
+            .map(talla => String(talla)); // Volver a string
+
+        const coloresOrdenados = Array.from(coloresMap.values())
+            .filter(color => color && color.nombre && color.hex)
+            .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        const resultado = {
+            subcategorias: Array.from(subcategoriasSet)
+                .filter(sub => typeof sub === 'string')
+                .sort(),
+            tallasLetra: tallasLetraOrdenadas,
+            tallasNumero: tallasNumeroOrdenadas,
+            colores: coloresOrdenados,
+            rangoPrecio: {
+                min: minPrecio === Infinity ? 0 : Math.max(0, minPrecio),
+                max: maxPrecio === -Infinity ? 0 : Math.max(0, maxPrecio)
+            },
+            rangoPrecioVariaciones: {
+                min: minPrecioVariacion === Infinity ? 0 : Math.max(0, minPrecioVariacion),
+                max: maxPrecioVariacion === -Infinity ? 0 : Math.max(0, maxPrecioVariacion)
+            }
+        };
+
+        // Validar el resultado final
+        if (!resultado.subcategorias || !resultado.tallasLetra || !resultado.colores) {
+            throw new Error('Estructura de filtros inválida');
         }
-    });
 
-    // Convertir sets a arrays ordenados
-    const tallasLetraOrdenadas = Array.from(tallasLetraSet).sort((a, b) => {
-        const orden = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-        return orden.indexOf(a) - orden.indexOf(b);
-    });
+        return resultado;
 
-    const tallasNumeroOrdenadas = Array.from(tallasNumeroSet)
-        .map(Number)
-        .filter(num => !isNaN(num))
-        .sort((a, b) => a - b)
-        .map(String);
-
-    const coloresOrdenados = Array.from(coloresMap.values())
-        .sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-    return {
-        subcategorias: Array.from(subcategoriasSet).sort(),
-        tallasLetra: tallasLetraOrdenadas,
-        tallasNumero: tallasNumeroOrdenadas,
-        colores: coloresOrdenados,
-        rangoPrecio: {
-            min: minPrecio === Infinity ? 0 : minPrecio,
-            max: maxPrecio === -Infinity ? 0 : maxPrecio
-        },
-        rangoPrecioVariaciones: {
-            min: minPrecioVariacion === Infinity ? 0 : minPrecioVariacion,
-            max: maxPrecioVariacion === -Infinity ? 0 : maxPrecioVariacion
-        }
-    };
+    } catch (error) {
+        console.error('❌ Error en generarFiltrosDinamicos:', error);
+        // Devolver estructura válida pero vacía en caso de error
+        return {
+            subcategorias: [],
+            tallasLetra: [],
+            tallasNumero: [],
+            colores: [],
+            rangoPrecio: { min: 0, max: 0 },
+            rangoPrecioVariaciones: { min: 0, max: 0 }
+        };
+    }
 };
 
 // 📄 Obtener todos los productos con filtros dinámicos mejorados
 const obtenerProductos = async (req, res) => {
     const cacheKey = 'productos_todos';
     try {
-        // Verificar caché solo si no hay parámetros de consulta
-        const cache = await redisClient.get(cacheKey);
-        if (cache && cache.result && Object.keys(req.query).length === 0) {
-            console.log('🟢 Productos cargados desde Redis');
-            return res.json(JSON.parse(cache.result));
+        const noQuery = Object.keys(req.query).length === 0;
+
+        if (noQuery) {
+            const cache = await redisClient.get(cacheKey);
+            if (cache) {
+                try {
+                    const parsed = JSON.parse(cache);
+                    if (parsed && parsed.productos) {
+                        console.log('🟢 Productos cargados desde Redis');
+                        return res.json(parsed);
+                    } else {
+                        console.warn('⚠️ Cache productos_todos con estructura inválida. Eliminando...');
+                        await redisClient.del(cacheKey);
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Cache productos_todos corrupta. Eliminando...', e.message);
+                    await redisClient.del(cacheKey);
+                }
+            }
         }
 
-        const { 
-            categoria, 
-            subcategoria, 
-            minPrecio, 
-            maxPrecio, 
-            disponible, 
-            busqueda,
-            tallaLetra,
-            tallaNumero,
-            color, // Puede ser nombre del color o hex
-            minPrecioVariacion,
-            maxPrecioVariacion
-        } = req.query;
-        
-        let query = {};
+        // Construir query según filtros de req.query
+        const { categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda,
+                tallaLetra, tallaNumero, color, minPrecioVariacion, maxPrecioVariacion } = req.query;
 
-        // Filtros básicos del producto
+        let query = {};
         if (categoria) query.categoria = categoria;
         if (subcategoria) query.subcategoria = subcategoria;
         if (minPrecio || maxPrecio) {
@@ -249,96 +303,97 @@ const obtenerProductos = async (req, res) => {
             ];
         }
 
-        // Obtener productos base
         let productos = await Producto.find(query).populate('variaciones');
 
-        // 🔍 Filtrar por variaciones si se especifican filtros de variación
+        // Filtrado adicional por variaciones si hay filtros específicos
         if (tallaLetra || tallaNumero || color || minPrecioVariacion || maxPrecioVariacion) {
-            productos = productos.filter(producto => {
-                return producto.variaciones.some(variacion => {
-                    let matches = true;
-
-                    // Filtro por talla letra
-                    if (tallaLetra && variacion.tallaLetra !== tallaLetra) {
-                        matches = false;
-                    }
-
-                    // Filtro por talla número
-                    if (tallaNumero && variacion.tallaNumero !== tallaNumero) {
-                        matches = false;
-                    }
-
-                    // Filtro por color (nombre o hex)
-                    if (color && variacion.color) {
-                        const colorLower = color.toLowerCase();
-                        const nombreColorLower = variacion.color.nombre?.toLowerCase() || '';
-                        const hexColor = variacion.color.hex?.toLowerCase() || '';
-                        
-                        if (!nombreColorLower.includes(colorLower) && hexColor !== colorLower) {
-                            matches = false;
-                        }
-                    }
-
-                    // Filtro por precio de variación
-                    if (minPrecioVariacion && variacion.precio < Number(minPrecioVariacion)) {
-                        matches = false;
-                    }
-                    if (maxPrecioVariacion && variacion.precio > Number(maxPrecioVariacion)) {
-                        matches = false;
-                    }
-
-                    return matches;
-                });
-            });
+            productos = productos.filter(producto => producto.variaciones?.some(variacion => {
+                let matches = true;
+                if (tallaLetra && variacion.tallaLetra !== tallaLetra) matches = false;
+                if (tallaNumero && variacion.tallaNumero !== tallaNumero) matches = false;
+                if (color && variacion.color) {
+                    const colorLower = color.toLowerCase();
+                    const nombreColorLower = variacion.color.nombre?.toLowerCase() || '';
+                    const hexColor = variacion.color.hex?.toLowerCase() || '';
+                    if (!nombreColorLower.includes(colorLower) && hexColor !== colorLower) matches = false;
+                }
+                if (minPrecioVariacion && variacion.precio < Number(minPrecioVariacion)) matches = false;
+                if (maxPrecioVariacion && variacion.precio > Number(maxPrecioVariacion)) matches = false;
+                return matches;
+            }));
         }
 
-        // 📊 Generar filtros dinámicos basados en TODOS los productos (no solo los filtrados)
-        const allProducts = await Producto.find().populate('variaciones');
-        
-        const filtrosDisponibles = generarFiltrosDinamicos(allProducts);
+        const response = { productos };
 
-        const response = { productos, filtrosDisponibles };
-
-        // Cachear solo si no hay parámetros de consulta
-        if (Object.keys(req.query).length === 0) {
-            await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
+        // Guardar en caché si no hay query params
+        if (noQuery) {
+            try {
+                await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
+                console.log('✅ Productos guardados correctamente en Redis');
+            } catch (cacheError) {
+                console.warn('⚠️ No se pudo guardar en cache:', cacheError.message);
+            }
         }
 
-        console.log('🟡 Productos cargados desde DB y procesados con filtros dinámicos');
+        console.log('🟡 Productos cargados desde DB');
         res.json(response);
+
     } catch (error) {
         console.error("❌ Error al obtener productos:", error);
         res.status(500).json({ mensaje: '❌ Error al cargar productos.', error: error.message });
     }
 };
 
-// 🎯 Obtener solo los filtros disponibles (endpoint separado para el frontend)
+
+
+
+// 🎯 Obtener solo los filtros disponibles (endpoint separado para el frontend) - VERSIÓN CORREGIDA
 const obtenerFiltrosDisponibles = async (req, res) => {
     const cacheKey = 'filtros_productos';
     try {
-        // Verificar caché
         const cache = await redisClient.get(cacheKey);
-        if (cache) {
-            console.log('🟢 Filtros cargados desde Redis');
-            return res.json(JSON.parse(cache));
+        if (cache?.result) {
+            try {
+                const parsedCache = JSON.parse(cache.result); // 👈 usar .result
+                if (parsedCache && typeof parsedCache === 'object' && parsedCache.subcategorias) {
+                    console.log('🟢 Filtros cargados desde Redis');
+                    return res.json(parsedCache);
+                } else {
+                    console.warn("⚠️ Cache con estructura inválida, eliminando...");
+                    await redisClient.del(cacheKey);
+                }
+            } catch (err) {
+                console.warn("⚠️ Cache corrupta, eliminando clave:", err.message);
+                await redisClient.del(cacheKey);
+            }
         }
 
-        // Obtener todos los productos con variaciones
+        console.log('🔄 Regenerando filtros desde DB...');
         const productos = await Producto.find().populate('variaciones');
-        
-        // Generar filtros dinámicos
         const filtrosDisponibles = generarFiltrosDinamicos(productos);
 
-        // Cachear los filtros por más tiempo (5 minutos)
-        await redisClient.set(cacheKey, JSON.stringify(filtrosDisponibles), { EX: 300 });
+        if (filtrosDisponibles && typeof filtrosDisponibles === 'object') {
+            try {
+                const json = JSON.stringify(filtrosDisponibles);
+                await redisClient.set(cacheKey, json, { EX: 300 });
+                console.log('✅ Filtros guardados correctamente en Redis');
+            } catch (jsonError) {
+                console.error('❌ Error al serializar filtros:', jsonError.message);
+            }
+        }
 
         console.log('🟡 Filtros generados desde DB');
         res.json(filtrosDisponibles);
+
     } catch (error) {
         console.error("❌ Error al obtener filtros:", error);
+        try { await redisClient.del(cacheKey); } catch {}
         res.status(500).json({ mensaje: '❌ Error al cargar filtros.', error: error.message });
     }
 };
+
+
+
 
 // 🔍 Obtener producto por ID (con historial)
 const obtenerProductoPorId = async (req, res) => {
@@ -473,7 +528,6 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-
 // 🗑️ Eliminar un producto (mejorado con limpieza de carritos, favoritos, anuncios e historial)
 const eliminarProducto = async (req, res) => {
     try {
@@ -586,9 +640,6 @@ const eliminarProducto = async (req, res) => {
         res.status(500).json({ mensaje: '❌ Error al eliminar el producto.', error: error.message });
     }
 };
-
-
-
 
 // 🔄 Cambiar estado del producto (corregido)
 const cambiarEstadoProducto = async (req, res) => {

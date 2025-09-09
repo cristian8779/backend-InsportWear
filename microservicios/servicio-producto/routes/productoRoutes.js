@@ -61,6 +61,12 @@ router.post('/upload-imagen-producto', verificarToken, verificarAdminOsuperAdmin
 // Estas rutas manejan la creación, visualización, actualización y eliminación de tus productos base.
 // ---
 
+// --- 🎯 FILTROS ---
+// ✅ NUEVO endpoint separado para los filtros dinámicos
+router.get('/filtros', obtenerFiltrosDisponibles);
+console.log('Ruta GET /filtros/disponibles: Configurada para obtener filtros dinámicos disponibles (Acceso público).');
+
+
 // ➕ Crear un nuevo producto: Requiere token, permisos de admin y una imagen.
 router.post('/', verificarToken, verificarAdminOsuperAdmin, uploadProducto.single('imagen'), crearProducto);
 console.log('Ruta POST /: Configurada para crear productos (Admin requerido, con imagen).');
@@ -129,8 +135,6 @@ console.log('Ruta PUT /:productoId/variaciones/:id/reducir-stock: Configurada pa
 
 // Nueva ruta para agregar una variación a un producto
 
-router.get('/filtros', obtenerFiltrosDisponibles); // NUEVO
-router.get('/', obtenerProductos)
 
 
 module.exports = router;
