@@ -142,6 +142,22 @@ async function cleanupCloudinaryFiles(files) {
     }
 }
 
+// Validar que solo se proporcione una talla
+function validarTallas(tallaLetra, tallaNumero) {
+    const tieneTallaLetra = tallaLetra !== undefined && tallaLetra !== null && tallaLetra !== '';
+    const tieneTallaNumero = tallaNumero !== undefined && tallaNumero !== null && tallaNumero !== '';
+
+    if (tieneTallaLetra && tieneTallaNumero) {
+        return { esValido: false, error: '🚫 Solo se puede ingresar una de las dos tallas: tallaLetra o tallaNumero, no ambas.' };
+    }
+
+    if (!tieneTallaLetra && !tieneTallaNumero) {
+        return { esValido: false, error: '🚫 Necesitamos al menos una talla (tallaLetra o tallaNumero).' };
+    }
+
+    return { esValido: true };
+}
+
 /* -------------------- Controlador -------------------- */
 
 const extraerColor = (body) => {
@@ -164,7 +180,13 @@ const agregarVariacion = async (req, res) => {
         stock = Number(stock); precio = Number(precio);
         const color = extraerColor(req.body);
 
-        if (!tallaLetra && !tallaNumero) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Necesitamos al menos una talla.' }); }
+        // Validar tallas
+        const validacionTallas = validarTallas(tallaLetra, tallaNumero);
+        if (!validacionTallas.esValido) {
+            await cleanupCloudinaryFiles(req.files);
+            return res.status(400).json({ mensaje: validacionTallas.error });
+        }
+
         if (isNaN(stock) || stock < 0) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Stock inválido.' }); }
         if (isNaN(precio) || precio < 0) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Precio inválido.' }); }
         if (!color) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Color obligatorio.' }); }
@@ -217,12 +239,45 @@ const actualizarVariacion = async (req, res) => {
         if (!variacion) { await cleanupCloudinaryFiles(req.files); return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' }); }
 
         let { tallaLetra, tallaNumero, stock, precio } = req.body;
+
+        // Validar y manejar cambios de talla
+        if ((tallaLetra !== undefined) || (tallaNumero !== undefined)) {
+            // PRIMERO: Validar que no se envíen ambas tallas al mismo tiempo
+            if ((tallaLetra !== undefined) && (tallaNumero !== undefined)) {
+                await cleanupCloudinaryFiles(req.files);
+                return res.status(400).json({ mensaje: '🚫 Solo se puede actualizar una de las dos tallas: tallaLetra o tallaNumero, no ambas.' });
+            }
+            
+            // Si se envía tallaLetra, limpiar tallaNumero
+            if (tallaLetra !== undefined) {
+                const validacionTallas = validarTallas(tallaLetra, null);
+                if (!validacionTallas.esValido) {
+                    await cleanupCloudinaryFiles(req.files);
+                    return res.status(400).json({ mensaje: validacionTallas.error });
+                }
+                // Actualizar tallaLetra y limpiar tallaNumero
+                variacion.tallaLetra = tallaLetra;
+                variacion.tallaNumero = null;
+            }
+            
+            // Si se envía tallaNumero, limpiar tallaLetra
+            if (tallaNumero !== undefined) {
+                const validacionTallas = validarTallas(null, tallaNumero);
+                if (!validacionTallas.esValido) {
+                    await cleanupCloudinaryFiles(req.files);
+                    return res.status(400).json({ mensaje: validacionTallas.error });
+                }
+                // Actualizar tallaNumero y limpiar tallaLetra
+                variacion.tallaNumero = tallaNumero;
+                variacion.tallaLetra = null;
+            }
+        }
+
         if (stock !== undefined) { stock = Number(stock); if (isNaN(stock) || stock < 0) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Stock inválido.' }); } }
         if (precio !== undefined) { precio = Number(precio); if (isNaN(precio) || precio < 0) { await cleanupCloudinaryFiles(req.files); return res.status(400).json({ mensaje: '🚫 Precio inválido.' }); } }
         const color = extraerColor(req.body);
 
-        if (tallaLetra !== undefined) variacion.tallaLetra = tallaLetra;
-        if (tallaNumero !== undefined) variacion.tallaNumero = tallaNumero;
+        // Actualizar otros campos
         if (stock !== undefined) variacion.stock = stock;
         if (precio !== undefined) variacion.precio = precio;
         if (color) variacion.color = color;
