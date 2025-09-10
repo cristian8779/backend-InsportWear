@@ -264,6 +264,7 @@ const obtenerProductos = async (req, res) => {
     try {
         const noQuery = Object.keys(req.query).length === 0;
 
+        // ⚡ Si no hay query, primero intentamos usar cache
         if (noQuery) {
             const cache = await redisClient.get(cacheKey);
             if (cache) {
@@ -273,19 +274,21 @@ const obtenerProductos = async (req, res) => {
                         console.log('🟢 Productos cargados desde Redis');
                         return res.json(parsed);
                     } else {
-                        console.warn('⚠️ Cache productos_todos con estructura inválida. Eliminando...');
+                        console.warn('⚠️ Cache productos_todos inválida, eliminando...');
                         await redisClient.del(cacheKey);
                     }
                 } catch (e) {
-                    console.warn('⚠️ Cache productos_todos corrupta. Eliminando...', e.message);
+                    console.warn('⚠️ Cache productos_todos corrupta, eliminando...', e.message);
                     await redisClient.del(cacheKey);
                 }
             }
         }
 
-        // Construir query según filtros de req.query
-        const { categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda,
-                tallaLetra, tallaNumero, color, minPrecioVariacion, maxPrecioVariacion } = req.query;
+        // 🛠️ Construir query base según filtros principales
+        const { 
+            categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda,
+            tallaLetra, tallaNumero, color, minPrecioVariacion, maxPrecioVariacion 
+        } = req.query;
 
         let query = {};
         if (categoria) query.categoria = categoria;
@@ -303,35 +306,44 @@ const obtenerProductos = async (req, res) => {
             ];
         }
 
+        // 🔎 Buscar en DB con populate de variaciones
         let productos = await Producto.find(query).populate('variaciones');
 
-        // Filtrado adicional por variaciones si hay filtros específicos
+        // 🎯 Filtrado adicional por variaciones
         if (tallaLetra || tallaNumero || color || minPrecioVariacion || maxPrecioVariacion) {
-            productos = productos.filter(producto => producto.variaciones?.some(variacion => {
-                let matches = true;
-                if (tallaLetra && variacion.tallaLetra !== tallaLetra) matches = false;
-                if (tallaNumero && variacion.tallaNumero !== tallaNumero) matches = false;
-                if (color && variacion.color) {
-                    const colorLower = color.toLowerCase();
-                    const nombreColorLower = variacion.color.nombre?.toLowerCase() || '';
-                    const hexColor = variacion.color.hex?.toLowerCase() || '';
-                    if (!nombreColorLower.includes(colorLower) && hexColor !== colorLower) matches = false;
-                }
-                if (minPrecioVariacion && variacion.precio < Number(minPrecioVariacion)) matches = false;
-                if (maxPrecioVariacion && variacion.precio > Number(maxPrecioVariacion)) matches = false;
-                return matches;
-            }));
+            productos = productos.filter(producto => {
+                if (!producto.variaciones || producto.variaciones.length === 0) return false;
+
+                return producto.variaciones.some(variacion => {
+                    let matches = true;
+
+                    if (tallaLetra && variacion.tallaLetra !== tallaLetra) matches = false;
+                    if (tallaNumero && variacion.tallaNumero !== tallaNumero) matches = false;
+
+                    if (color && variacion.color) {
+                        const colorLower = color.toLowerCase();
+                        const nombreColorLower = variacion.color.nombre?.toLowerCase() || '';
+                        const hexColor = variacion.color.hex?.toLowerCase() || '';
+                        if (!nombreColorLower.includes(colorLower) && hexColor !== colorLower) matches = false;
+                    }
+
+                    if (minPrecioVariacion && variacion.precio < Number(minPrecioVariacion)) matches = false;
+                    if (maxPrecioVariacion && variacion.precio > Number(maxPrecioVariacion)) matches = false;
+
+                    return matches;
+                });
+            });
         }
 
         const response = { productos };
 
-        // Guardar en caché si no hay query params
+        // ⚡ Guardar en cache solo si no hay query
         if (noQuery) {
             try {
                 await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
-                console.log('✅ Productos guardados correctamente en Redis');
+                console.log('✅ Productos guardados en Redis');
             } catch (cacheError) {
-                console.warn('⚠️ No se pudo guardar en cache:', cacheError.message);
+                console.warn('⚠️ Error al guardar en cache:', cacheError.message);
             }
         }
 
