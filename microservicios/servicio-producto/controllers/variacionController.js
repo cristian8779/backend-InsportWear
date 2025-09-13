@@ -330,29 +330,44 @@ const eliminarVariacion = async (req, res) => {
 
 const reducirStockVariacion = async (req, res) => {
     try {
-        const { productoId, variacionId } = req.params;
+        const { productoId, id } = req.params; // OJO, aquí no es variacionId, es "id"
         const { cantidad } = req.body;
 
-        const numericCantidad = Number(cantidad);
-        if (isNaN(numericCantidad) || numericCantidad <= 0) return res.status(400).json({ mensaje: '🚫 Cantidad inválida.' });
+        console.log("📥 Datos recibidos en reducirStockVariacion:", {
+            productoId,
+            variacionId: id,
+            cantidad,
+        });
 
+        // 🔎 Buscar producto
         const producto = await Producto.findById(productoId);
-        if (!producto) return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
+        if (!producto) {
+            return res.status(404).json({ mensaje: "Producto no encontrado" });
+        }
 
-        const variacion = producto.variaciones.id(variacionId);
-        if (!variacion) return res.status(404).json({ mensaje: '⚠️ Variación no encontrada.' });
+        // 🔎 Buscar la variación dentro del producto
+        const variacion = producto.variaciones.id(id);
+        if (!variacion) {
+            console.log("⚠️ Variación no encontrada:", id);
+            return res.status(404).json({ mensaje: "Variación no encontrada" });
+        }
 
-        if (Number(variacion.stock) < numericCantidad) return res.status(400).json({ mensaje: `🚫 No hay suficiente stock. Disponible: ${variacion.stock}` });
+        // 📉 Reducir stock
+        if (variacion.stock < cantidad) {
+            return res.status(400).json({ mensaje: "Stock insuficiente" });
+        }
+        variacion.stock -= cantidad;
 
-        variacion.stock -= numericCantidad;
         await producto.save();
 
-        res.status(200).json({ mensaje: `✅ Stock reducido. Disponible: ${variacion.stock}`, variacionActualizada: variacion });
-
+        return res.status(200).json({ mensaje: "Stock de la variación reducido", variacion });
     } catch (error) {
-        res.status(500).json({ mensaje: '❌ Error reduciendo stock.', error: error.message });
+        console.error("❌ Error en reducirStockVariacion:", error);
+        res.status(500).json({ mensaje: "Error en el servidor" });
     }
 };
+
+
 
 module.exports = {
     agregarVariacion,

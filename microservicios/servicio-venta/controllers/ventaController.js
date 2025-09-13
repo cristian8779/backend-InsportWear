@@ -22,15 +22,16 @@ exports.crearVenta = async (req, res) => {
     const { productos, total } = req.body;
     const usuarioId = req.usuario.id;
 
+    // 🔹 Solo para ventas manuales de admin reducimos stock
     const operacionesStock = productos.map((item) =>
       verificarYReducirStock({
         productoId: item.productoId,
         cantidad: item.cantidad,
         talla: item.talla,
         color: item.color,
+        adminManual: true
       })
     );
-
     await Promise.all(operacionesStock);
 
     const productosLimpios = await Promise.all(
@@ -84,41 +85,53 @@ exports.crearVentaDesdePago = async (req, res) => {
       return res.status(400).json({ mensaje: "Faltan datos requeridos para registrar la venta." });
     }
 
-    // Validar stock
-    const operacionesStock = productos.map((item) =>
-      verificarYReducirStock({
-        productoId: item.productoId,
-        cantidad: item.cantidad,
-        talla: item.talla,
-        color: item.color,
-      })
-    );
-    await Promise.all(operacionesStock);
+    // 🔹 No reducimos stock para ventas desde pago
 
-    // Obtener nombres de productos
     const productosLimpios = await Promise.all(
       productos.map(async (p) => {
-        const productoId = typeof p.productoId === "object"
-          ? p.productoId._id?.toString() || p.productoId.toString()
-          : p.productoId;
+        const productoId =
+          typeof p.productoId === "object"
+            ? p.productoId._id?.toString() || p.productoId.toString()
+            : p.productoId;
 
         if (!productoId) throw new Error("ProductoId inválido en venta.");
 
         let nombreProducto = "Producto eliminado";
+        let talla = null;
+        let color = null;
+        let precioUnitario = 0;
+
         try {
           const producto = await obtenerProductoPorId(productoId);
           nombreProducto = producto?.nombre?.trim() || nombreProducto;
+
+          // 🔹 Si hay variaciónId, obtener talla, color y precio desde la variación
+          if (p.variacionId && producto.variaciones?.length) {
+            const variacion = producto.variaciones.find(v => v._id === p.variacionId);
+            if (variacion) {
+              talla = variacion.tallaLetra || variacion.tallaNumero || null;
+              color = variacion.color || null;
+              precioUnitario = variacion.precio || producto.precio || 0;
+            }
+          } else {
+            // Si no hay variación, usamos los datos que venga o del producto
+            talla = p.talla || null;
+            color = p.color || null;
+            precioUnitario = p.precioUnitario || producto.precio || 0;
+          }
+
         } catch (err) {
           console.warn(`⚠️ Producto no encontrado (${productoId}): ${err.message}`);
         }
 
         return {
           productoId,
+          variacionId: p.variacionId || null,
           nombreProducto,
-          talla: p.talla || null,
-          color: p.color || null,
+          talla,
+          color,
           cantidad: p.cantidad || 0,
-          precioUnitario: p.precioUnitario || 0,
+          precioUnitario, // <-- ahora correcto
         };
       })
     );
@@ -145,6 +158,7 @@ exports.crearVentaDesdePago = async (req, res) => {
     });
   }
 };
+
 
 // 👤 Ventas del usuario autenticado
 exports.obtenerVentasUsuario = async (req, res) => {
@@ -177,7 +191,7 @@ exports.obtenerTodasLasVentas = async (req, res) => {
     if (producto) {
       ventas = ventas.filter((v) =>
         v.productos.some((p) =>
-          p.nombreProducto?.toLowerCase().includes(product.toLowerCase())
+          p.nombreProducto?.toLowerCase().includes(producto.toLowerCase())
         )
       );
     }

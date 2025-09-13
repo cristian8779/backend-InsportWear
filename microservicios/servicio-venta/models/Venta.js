@@ -6,13 +6,20 @@ const productoSchema = new mongoose.Schema({
     ref: "Producto",
     required: true
   },
-  nombreProducto: { // <-- Este campo es nuevo
+  nombreProducto: {
     type: String,
     required: true,
     trim: true
   },
-  talla: { type: String, required: true },
-  color: { type: String, required: true },
+  // 🔹 Talla y color opcionales para ventas desde pago (solo se usan si hay variación)
+  talla: { type: String, required: false },
+  color: {
+    type: {
+      hex: { type: String },
+      nombre: { type: String }
+    },
+    required: false
+  },
   cantidad: { type: Number, required: true },
   precioUnitario: { type: Number, required: true }
 });

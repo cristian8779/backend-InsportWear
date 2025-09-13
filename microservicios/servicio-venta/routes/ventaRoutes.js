@@ -4,6 +4,10 @@ const ventaController = require("../controllers/ventaController");
 const { verificarToken, verificarAdmin } = require("../middlewares/authMiddleware");
 const verificarApiKey = require("../middlewares/verificarApiKey");
 
+// 🔐 Ruta interna para microservicios (crear venta desde pagos con API key)
+// ⚡️ Esta va antes de aplicar verificarToken
+router.post("/crear", verificarApiKey, ventaController.crearVentaDesdePago);
+
 // 🔐 Rutas protegidas con token de usuario
 router.use(verificarToken);
 
@@ -24,8 +28,5 @@ router.put("/:id", verificarAdmin, ventaController.actualizarEstadoVenta);
 
 // ❌ Eliminar una venta (solo Admin o SuperAdmin)
 router.delete("/:id", verificarAdmin, ventaController.eliminarVenta);
-
-// 🔐 Ruta interna para microservicios (crear venta desde pagos con API key)
-router.post("/crear", verificarApiKey, ventaController.crearVentaDesdePago);
 
 module.exports = router;

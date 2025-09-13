@@ -41,25 +41,19 @@ const obtenerCarrito = async (req, res) => {
       let variacion = null;
       if (item.variacionId) {
         variacion = producto.variaciones?.find(v => String(v._id) === String(item.variacionId));
-        if (!variacion) {
-          console.warn(`⚠️ Variación ${item.variacionId} no encontrada en producto ${producto.nombre}`);
-        }
       }
 
-      // Precio preferentemente del remoto (o del item si prefieres el guardado)
       const precioBase = variacion ? variacion.precio : producto.precio;
-
-      // Imagen: 1) la guardada en el item, 2) la de la variación, 3) la del producto
       const imagenVariacion = variacion?.imagenes?.[0]?.url;
       const imagen = item.imagen || imagenVariacion || producto.imagen;
 
       productosEnriquecidos.push({
         productoId: item.productoId,
-        variacionId: item.variacionId,
+        variacionId: item.variacionId || null,
         cantidad: item.cantidad,
         precio: precioBase,
         nombre: producto.nombre,
-        imagen, // 👈 mostramos la que decidimos arriba
+        imagen,
         atributos: item.atributos || {},
         subtotal: precioBase * item.cantidad
       });
@@ -73,9 +67,6 @@ const obtenerCarrito = async (req, res) => {
   }
 };
 
-
-
-
 // ➕ Agregar producto al carrito
 const agregarAlCarrito = async (req, res) => {
   const { productoId, variacionId, cantidad = 1 } = req.body;
@@ -86,35 +77,32 @@ const agregarAlCarrito = async (req, res) => {
 
   try {
     const userId = req.user._id;
-
     const producto = await obtenerProductoRemoto(productoId);
     if (!producto) {
       return res.status(404).json({ mensaje: 'Producto no encontrado.' });
     }
 
-    // Por defecto, precio/imagen del producto principal
     let precio = producto.precio;
     let imagen = producto.imagen;
     let atributos = {};
 
-    // Si viene variación, usar precio e imagen de la variación
     if (variacionId) {
       const variacion = producto.variaciones?.find(v => String(v._id) === String(variacionId));
       if (!variacion) {
         return res.status(404).json({ mensaje: 'Variación no encontrada.' });
       }
 
-      const imagenVariacion = variacion.imagenes?.[0]?.url; // 👈 O la que quieras elegir
+      const imagenVariacion = variacion.imagenes?.[0]?.url || null;
       precio = variacion.precio;
       imagen = imagenVariacion || producto.imagen;
 
-      atributos = {
-        color: variacion.color || {},
-        tallaLetra: variacion.tallaLetra,
-        tallaNumero: variacion.tallaNumero,
-        imagen: imagenVariacion || null,      // referenciamos la url usada
-        imagenes: variacion.imagenes || []    // opcional, por si te sirve guardarlas
-      };
+      // 🔒 Evitar undefined en atributos
+      atributos = {};
+      if (variacion.color) atributos.color = variacion.color;
+      if (variacion.tallaLetra) atributos.tallaLetra = variacion.tallaLetra;
+      if (variacion.tallaNumero) atributos.tallaNumero = variacion.tallaNumero;
+      if (imagenVariacion) atributos.imagen = imagenVariacion;
+      if (variacion.imagenes?.length) atributos.imagenes = variacion.imagenes;
     }
 
     let carrito = await Carrito.findOne({ usuarioId: userId });
@@ -122,7 +110,6 @@ const agregarAlCarrito = async (req, res) => {
       carrito = new Carrito({ usuarioId: userId, productos: [] });
     }
 
-    // Misma combinación producto + variación => suma cantidades
     const index = carrito.productos.findIndex(p =>
       p.productoId.toString() === productoId &&
       String(p.variacionId || '') === String(variacionId || '')
@@ -130,8 +117,6 @@ const agregarAlCarrito = async (req, res) => {
 
     if (index >= 0) {
       carrito.productos[index].cantidad += cantidad;
-
-      // Opcional: mantener consistentes precio/imagen si cambian
       carrito.productos[index].precio = precio;
       carrito.productos[index].imagen = imagen;
       carrito.productos[index].atributos = { ...(carrito.productos[index].atributos || {}), ...atributos };
@@ -141,22 +126,19 @@ const agregarAlCarrito = async (req, res) => {
         variacionId: variacionId || null,
         cantidad,
         precio,
-        imagen,     // 👈 guardamos la imagen elegida (variación > producto)
+        imagen,
         atributos
       });
     }
 
     await carrito.save();
     console.log("✅ Carrito actualizado:", JSON.stringify(carrito, null, 2));
-
     res.status(200).json({ mensaje: 'Producto agregado al carrito con éxito.', carrito });
   } catch (err) {
     console.error('❌ Error al agregar al carrito:', err);
     res.status(500).json({ mensaje: 'No pudimos agregar el producto. Probá de nuevo en unos minutos.' });
   }
 };
-
-
 
 // 🔁 Actualizar cantidad
 const actualizarCantidad = async (req, res) => {
@@ -212,8 +194,6 @@ const eliminarDelCarrito = async (req, res) => {
   }
 };
 
-
-
 // 🧾 Resumen del carrito (ENRIQUECIDO)
 const obtenerResumenCarrito = async (req, res) => {
   try {
@@ -237,18 +217,16 @@ const obtenerResumenCarrito = async (req, res) => {
       }
 
       const precioBase = variacion ? variacion.precio : producto.precio;
-
-      // Misma regla de imagen que en obtenerCarrito
       const imagenVariacion = variacion?.imagenes?.[0]?.url;
       const imagen = item.imagen || imagenVariacion || producto.imagen;
 
       resumen.push({
         productoId: item.productoId,
-        variacionId: item.variacionId,
+        variacionId: item.variacionId || null,
         nombre: producto.nombre,
         cantidad: item.cantidad,
         precio: precioBase,
-        imagen, // 👈 consistente
+        imagen,
         atributos: item.atributos || {},
         subtotal: precioBase * item.cantidad
       });
@@ -261,8 +239,6 @@ const obtenerResumenCarrito = async (req, res) => {
     res.status(500).json({ mensaje: 'No pudimos generar el resumen.' });
   }
 };
-
-
 
 // 🧹 Vaciar carrito
 const vaciarCarrito = async (req, res) => {
@@ -285,7 +261,6 @@ const vaciarCarrito = async (req, res) => {
   }
 };
 
-
 const eliminarProductoDeTodosLosCarritos = async (req, res) => {
   try {
     const { productoId } = req.params;
@@ -296,7 +271,7 @@ const eliminarProductoDeTodosLosCarritos = async (req, res) => {
 
     const resultado = await Carrito.updateMany(
       {},
-      { $pull: { productos: { productoId: new mongoose.Types.ObjectId(productoId) } } } // 👈 Convertir a ObjectId
+      { $pull: { productos: { productoId: new mongoose.Types.ObjectId(productoId) } } }
     );
 
     res.status(200).json({
@@ -308,7 +283,6 @@ const eliminarProductoDeTodosLosCarritos = async (req, res) => {
     res.status(500).json({ mensaje: 'Error eliminando producto de carritos.', error: err.message });
   }
 };
-
 
 module.exports = {
   obtenerCarrito,
