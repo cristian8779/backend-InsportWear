@@ -170,11 +170,13 @@ exports.obtenerVentasUsuario = async (req, res) => {
       return res.status(404).json({ mensaje: "Aún no has realizado ninguna venta." });
     }
 
+    ventas = await expandirVentas(ventas); // 👈 expandir aquí
     res.json(ventas);
   } catch (error) {
     res.status(500).json({ mensaje: "Error al obtener tus ventas.", error: error.message });
   }
 };
+
 
 // 📊 Todas las ventas con filtros (Admin)
 exports.obtenerTodasLasVentas = async (req, res) => {
@@ -200,11 +202,13 @@ exports.obtenerTodasLasVentas = async (req, res) => {
       return res.status(404).json({ mensaje: "No hay ventas con los filtros seleccionados." });
     }
 
+    ventas = await expandirVentas(ventas); // 👈 expandir aquí
     res.json(ventas);
   } catch (error) {
     res.status(500).json({ mensaje: "Error al consultar las ventas.", error: error.message });
   }
 };
+
 
 // 🔄 Cambiar estado de una venta (Admin)
 exports.actualizarEstadoVenta = async (req, res) => {

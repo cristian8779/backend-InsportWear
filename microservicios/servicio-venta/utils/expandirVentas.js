@@ -3,16 +3,21 @@ const axios = require("axios");
 const URL_USUARIO = process.env.URL_MICROSERVICIO_USUARIO;
 const URL_PRODUCTO = process.env.URL_MICROSERVICIO_PRODUCTO;
 
-// 🔄 Obtener usuario por ID
+// 🔄 Obtener usuario por ID (maneja diferentes estructuras de respuesta)
 const obtenerUsuarioPorId = async (id) => {
   try {
     const { data } = await axios.get(`${URL_USUARIO}/${id}`);
-    return data?.usuario || data;
+
+    // Soporta distintas formas de respuesta
+    if (data?.usuario) return data.usuario;   // { usuario: {...} }
+    if (data?.data) return data.data;         // { data: {...} }
+    return data;                              // {...} directo
   } catch (error) {
     console.error(`❌ Error al obtener usuario (${id}):`, error.response?.data || error.message);
     throw new Error("Usuario no encontrado");
   }
 };
+
 
 // 🧾 Expandir ventas con nombre de usuario y nombre de producto ya persistido
 const expandirVentas = async (ventas) => {
@@ -21,12 +26,11 @@ const expandirVentas = async (ventas) => {
       // 👤 Expandir nombre del usuario
       try {
         const usuario = await obtenerUsuarioPorId(venta.usuarioId);
-        venta.nombreUsuario = typeof usuario?.nombre === "string"
-          ? usuario.nombre.trim()
-          : "Usuario eliminado";
+        venta.nombreUsuario = usuario?.nombre?.trim() || "Usuario eliminado";
       } catch (err) {
         venta.nombreUsuario = "Usuario eliminado";
       }
+
 
       // 📦 Validar nombreProducto ya guardado en los datos
       venta.productos = (venta.productos || []).map((p) => {
