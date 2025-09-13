@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 const BOLD_API_URL = "https://payments.api.bold.co/v2/payment-voucher";
-const BOLD_API_KEY = process.env.BOLD_API_KEY;
+const BOLD_API_KEY = process.env.BOLD_SECRET_KEY; // 🔹 Cambiado para coincidir con tu .env
 
 exports.verificarPago = async (orderId) => {
   if (!orderId) {
