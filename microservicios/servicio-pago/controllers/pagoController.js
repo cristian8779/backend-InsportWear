@@ -5,6 +5,23 @@ const productoService = require("../services/productoService"); // productos bas
 const variacionService = require("../services/variacionService"); // variaciones
 const ventaService = require("../services/ventaService"); // ventas
 
+// Traducción de estados Bold a español
+const traducirEstadoPago = (estado) => {
+  switch ((estado || "").toLowerCase()) {
+    case "approved":
+      return "aprobado";
+    case "pending":
+      return "pendiente";
+    case "failed":
+      return "fallido";
+    case "canceled":
+    case "cancelled":
+      return "cancelado";
+    default:
+      return "desconocido";
+  }
+};
+
 exports.confirmarPago = async (req, res) => {
   try {
     const userId = req.userId || req.body.userId;
@@ -17,11 +34,13 @@ exports.confirmarPago = async (req, res) => {
     }
 
     // 1. Verificar el pago en Bold
-    const estado = await boldService.verificarPago(orderId);
-    if (estado !== "APPROVED") {
+    const estadoBold = await boldService.verificarPago(orderId);
+    const estado = estadoBold?.toLowerCase();
+
+    if (estado !== "approved") {
       return res.status(400).json({
         mensaje: "El pago aún no ha sido aprobado.",
-        estado: estado?.toLowerCase() || "pendiente",
+        estado: traducirEstadoPago(estado),
       });
     }
 
@@ -33,14 +52,21 @@ exports.confirmarPago = async (req, res) => {
 
     // 3. Reducir stock correctamente
     for (const item of productos) {
-      if (item.variacionId) {
-        await variacionService.reducirStock(
-          item.productoId,
-          item.variacionId,
-          item.cantidad
-        );
-      } else {
-        await productoService.reducirStock(item.productoId, item.cantidad);
+      try {
+        if (item.variacionId) {
+          await variacionService.reducirStock(
+            item.productoId,
+            item.variacionId,
+            item.cantidad
+          );
+        } else {
+          await productoService.reducirStock(item.productoId, item.cantidad);
+        }
+      } catch (stockError) {
+        return res.status(400).json({
+          mensaje: `Stock insuficiente para el producto ${item.productoId}${item.variacionId ? " (variación " + item.variacionId + ")" : ""}.`,
+          error: stockError.message || stockError,
+        });
       }
     }
 
@@ -60,7 +86,7 @@ exports.confirmarPago = async (req, res) => {
     // 6. Respuesta final
     res.status(201).json({
       mensaje: "✅ Pago confirmado, stock actualizado, venta creada y carrito vaciado.",
-      estado: "approved",
+      estado: traducirEstadoPago(estado),
       total,
       venta,
     });
