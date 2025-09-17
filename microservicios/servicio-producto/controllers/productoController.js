@@ -258,13 +258,20 @@ const generarFiltrosDinamicos = (productos) => {
     }
 };
 
-// 📄 Obtener todos los productos con filtros dinámicos mejorados
+// 📄 Obtener todos los productos con filtros dinámicos + paginación
 const obtenerProductos = async (req, res) => {
-    const cacheKey = 'productos_todos';
     try {
-        const noQuery = Object.keys(req.query).length === 0;
+        const {
+            categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda,
+            tallaLetra, tallaNumero, color, minPrecioVariacion, maxPrecioVariacion,
+            page = 0, limit = 20
+        } = req.query;
 
-        // ⚡ Si no hay query, primero intentamos usar cache
+        const skip = Number(page) * Number(limit);
+        const cacheKey = `productos_${categoria || 'all'}_${subcategoria || 'all'}_${page}_${limit}`;
+
+        // ⚡ Si no hay filtros ni búsqueda, intentamos usar cache
+        const noQuery = Object.keys(req.query).filter(k => !['page', 'limit'].includes(k)).length === 0;
         if (noQuery) {
             const cache = await redisClient.get(cacheKey);
             if (cache) {
@@ -274,22 +281,17 @@ const obtenerProductos = async (req, res) => {
                         console.log('🟢 Productos cargados desde Redis');
                         return res.json(parsed);
                     } else {
-                        console.warn('⚠️ Cache productos_todos inválida, eliminando...');
+                        console.warn('⚠️ Cache inválida, eliminando...');
                         await redisClient.del(cacheKey);
                     }
                 } catch (e) {
-                    console.warn('⚠️ Cache productos_todos corrupta, eliminando...', e.message);
+                    console.warn('⚠️ Cache corrupta, eliminando...', e.message);
                     await redisClient.del(cacheKey);
                 }
             }
         }
 
         // 🛠️ Construir query base según filtros principales
-        const { 
-            categoria, subcategoria, minPrecio, maxPrecio, disponible, busqueda,
-            tallaLetra, tallaNumero, color, minPrecioVariacion, maxPrecioVariacion 
-        } = req.query;
-
         let query = {};
         if (categoria) query.categoria = categoria;
         if (subcategoria) query.subcategoria = subcategoria;
@@ -306,8 +308,11 @@ const obtenerProductos = async (req, res) => {
             ];
         }
 
-        // 🔎 Buscar en DB con populate de variaciones
-        let productos = await Producto.find(query).populate('variaciones');
+        // 🔎 Buscar en DB con populate de variaciones + paginación
+        let productos = await Producto.find(query)
+            .populate('variaciones')
+            .skip(skip)
+            .limit(Number(limit));
 
         // 🎯 Filtrado adicional por variaciones
         if (tallaLetra || tallaNumero || color || minPrecioVariacion || maxPrecioVariacion) {
@@ -335,9 +340,19 @@ const obtenerProductos = async (req, res) => {
             });
         }
 
-        const response = { productos };
+        // 📊 Calcular total y hasMore
+        const total = await Producto.countDocuments(query);
+        const hasMore = skip + productos.length < total;
 
-        // ⚡ Guardar en cache solo si no hay query
+        const response = {
+            productos,
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            hasMore
+        };
+
+        // ⚡ Guardar en cache solo si no hay filtros
         if (noQuery) {
             try {
                 await redisClient.set(cacheKey, JSON.stringify(response), { EX: 60 });
@@ -355,7 +370,6 @@ const obtenerProductos = async (req, res) => {
         res.status(500).json({ mensaje: '❌ Error al cargar productos.', error: error.message });
     }
 };
-
 
 
 
