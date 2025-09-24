@@ -1,58 +1,37 @@
+// utils/expandirVentas.js
 const axios = require("axios");
-
 const URL_USUARIO = process.env.URL_MICROSERVICIO_USUARIO;
-const URL_PRODUCTO = process.env.URL_MICROSERVICIO_PRODUCTO;
 
-// 🔄 Obtener usuario por ID (maneja diferentes estructuras de respuesta)
+// 🔄 Obtener usuario completo desde microservicio de usuarios
 const obtenerUsuarioPorId = async (id) => {
   try {
-    const { data } = await axios.get(`${URL_USUARIO}/${id}`);
+    if (!URL_USUARIO) throw new Error("❌ URL_MICROSERVICIO_USUARIO no está configurada en .env");
 
-    // Soporta distintas formas de respuesta
-    if (data?.usuario) return data.usuario;   // { usuario: {...} }
-    if (data?.data) return data.data;         // { data: {...} }
-    return data;                              // {...} directo
+    const { data } = await axios.get(`${URL_USUARIO}/${id}`);
+    if (data?.usuario) return data.usuario;
+    if (data?.data) return data.data;
+
+    return data;
   } catch (error) {
     console.error(`❌ Error al obtener usuario (${id}):`, error.response?.data || error.message);
-    throw new Error("Usuario no encontrado");
+    return { nombre: "Desconocido", telefono: "", direccion: {} };
   }
 };
 
-
-// 🧾 Expandir ventas con nombre de usuario y nombre de producto ya persistido
-const expandirVentas = async (ventas) => {
+// 🔹 Función para expandir ventas agregando info del usuario
+async function expandirVentas(ventas) {
   return Promise.all(
     ventas.map(async (venta) => {
-      // 👤 Expandir nombre del usuario
-      try {
-        const usuario = await obtenerUsuarioPorId(venta.usuarioId);
-        venta.nombreUsuario = usuario?.nombre?.trim() || "Usuario eliminado";
-      } catch (err) {
-        venta.nombreUsuario = "Usuario eliminado";
-      }
-
-
-      // 📦 Validar nombreProducto ya guardado en los datos
-      venta.productos = (venta.productos || []).map((p) => {
-        // Asegurar que sea un objeto plano
-        const productoPlano =
-          typeof p.toObject === "function"
-            ? p.toObject()
-            : JSON.parse(JSON.stringify(p));
-
-        const nombreProducto = typeof p.nombreProducto === "string" && p.nombreProducto.trim()
-          ? p.nombreProducto.trim()
-          : "Producto eliminado";
-
-        return {
-          ...productoPlano,
-          nombreProducto,
-        };
-      });
-
-      return venta;
+      const usuario = await obtenerUsuarioPorId(venta.usuarioId);
+      return {
+        ...venta._doc, // si usas Mongoose
+        nombreUsuario: usuario.nombre || "Desconocido",
+        telefonoUsuario: usuario.telefono || "",
+        direccionUsuario: usuario.direccion || {},
+      };
     })
   );
-};
+}
 
+// ⚡ Exportamos directamente la función
 module.exports = expandirVentas;

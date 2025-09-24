@@ -14,10 +14,33 @@ if (!BASE_URL_PRODUCTO || !BASE_URL_USUARIO) {
 exports.obtenerProductoPorId = async (productoId) => {
   console.log("📦 Obtener producto por ID:", productoId);
   try {
-    // ✅ Aquí ya no se duplica /api/productos
     const { data } = await axios.get(`${BASE_URL_PRODUCTO}/${productoId}`);
-    console.log("✅ Producto obtenido:", data.producto ? data.producto._id : null);
-    return data.producto || data;
+
+    if (!data.producto) throw new Error("Producto no encontrado");
+
+    const producto = data.producto;
+
+    // Mapear variaciones incluyendo imagen
+    const variaciones = (producto.variaciones || []).map(v => ({
+      _id: v._id,
+      tallaLetra: v.tallaLetra,
+      tallaNumero: v.tallaNumero,
+      color: v.color || null,
+      precio: v.precio,
+      stock: v.stock,
+      imagen: v.imagen || null
+    }));
+
+    return {
+      _id: producto._id,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      stock: producto.stock,
+      imagen: producto.imagen || null,
+      imagenes: producto.imagenes || [],
+      variaciones
+    };
+
   } catch (error) {
     console.error("❌ Error al obtener el producto por ID:", productoId, error.message);
     throw new Error(`Error al obtener el producto: ${error.response?.data?.mensaje || error.message}`);
@@ -69,7 +92,7 @@ exports.verificarYReducirStock = async ({
       variacion = producto.variaciones.find(v => v._id === variacionId);
     } else {
       variacion = producto.variaciones.find(v => {
-        const mismoTalla = v.talla === talla;
+        const mismoTalla = v.tallaLetra === talla || v.tallaNumero === talla;
         const mismoColor = v.color && color
           ? v.color.hex === color.hex && v.color.nombre === color.nombre
           : !v.color && !color;

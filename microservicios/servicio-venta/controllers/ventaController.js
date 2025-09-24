@@ -1,10 +1,11 @@
+// controllers/ventaController.js
 const Venta = require("../models/Venta");
-const { verificarYReducirStock, obtenerProductoPorId } = require("../utils/servicioProducto");
-const generarExcelVentas = require("../utils/exportarVentasExcel");
+const { obtenerProductoPorId } = require("../utils/servicioProducto");
 const expandirVentas = require("../utils/expandirVentas");
 const { DateTime } = require("luxon");
+const axios = require("axios");
 
-// 🔍 Filtros para consultas
+// Construir filtro para consultas admin
 const construirFiltroVentas = ({ fechaInicio, fechaFin, estado }) => {
   const filtro = {};
   if (fechaInicio || fechaFin) {
@@ -16,77 +17,88 @@ const construirFiltroVentas = ({ fechaInicio, fechaFin, estado }) => {
   return filtro;
 };
 
-// 📦 Crear venta desde el frontend (usuario autenticado)
-exports.crearVenta = async (req, res) => {
+// 1️⃣ Crear venta en estado "pending"
+exports.crearVentaPendiente = async (req, res) => {
   try {
-    const { productos, total } = req.body;
-    const usuarioId = req.usuario.id;
+    const { usuarioId, productos, total, referenciaPago } = req.body;
+    if (!usuarioId || !Array.isArray(productos) || productos.length === 0 || !total || !referenciaPago)
+      return res.status(400).json({ mensaje: "Datos incompletos o inválidos para crear la venta." });
 
-    // 🔹 Solo para ventas manuales de admin reducimos stock
-    const operacionesStock = productos.map((item) =>
-      verificarYReducirStock({
-        productoId: item.productoId,
-        cantidad: item.cantidad,
-        talla: item.talla,
-        color: item.color,
-        adminManual: true
-      })
-    );
-    await Promise.all(operacionesStock);
-
-    const productosLimpios = await Promise.all(
-      productos.map(async (p) => {
-        const productoId =
-          typeof p.productoId === "object" && p.productoId !== null
-            ? p.productoId._id?.toString() || p.productoId.toString()
-            : p.productoId;
-
-        if (!productoId) throw new Error("ProductoId inválido en el cuerpo de la venta.");
-
-        let nombreProducto = "Producto eliminado";
-        try {
-          const producto = await obtenerProductoPorId(productoId);
-          nombreProducto = producto?.nombre?.trim() || nombreProducto;
-        } catch (err) {
-          console.warn(`⚠️ Producto no encontrado (${productoId}): ${err.message}`);
-        }
-
-        return {
-          productoId,
-          nombreProducto,
-          talla: p.talla || null,
-          color: p.color || null,
-          cantidad: p.cantidad || 0,
-          precioUnitario: p.precioUnitario || 0,
-        };
-      })
-    );
+    const usuario = await obtenerUsuarioPorId(usuarioId);
 
     const nuevaVenta = new Venta({
       usuarioId,
-      productos: productosLimpios,
+      productos,
       total,
+      referenciaPago,
+      estadoPago: "pending",
+      nombreUsuario: usuario?.nombre || "Desconocido",
+      telefonoUsuario: usuario?.telefono || "",
+      direccionUsuario: usuario?.direccion || {}
     });
 
     await nuevaVenta.save();
-    res.status(201).json(nuevaVenta);
+
+    res.status(201).json({
+      mensaje: "✅ Venta creada en estado pendiente. Esperando confirmación de pago.",
+      venta: nuevaVenta
+    });
   } catch (error) {
-    console.error("❌ Error en crearVenta:", error);
-    res.status(500).json({ mensaje: "Error al procesar la venta.", error: error.message });
+    console.error("❌ Error al crear venta pendiente:", error.message);
+    res.status(500).json({ mensaje: "No se pudo crear la venta. Intentá más tarde." });
   }
 };
 
-// 📦 Crear venta desde microservicio de pagos (API Key)
+// 2️⃣ Confirmar pago y actualizar estado de la venta
+exports.confirmarPago = async (req, res) => {
+  try {
+    const { referenciaPago, estadoPagoBold } = req.body;
+    if (!referenciaPago || !estadoPagoBold) return res.status(400).json({ mensaje: "Faltan datos para confirmar el pago." });
+
+    const venta = await Venta.findOne({ referenciaPago });
+    if (!venta) return res.status(404).json({ mensaje: "No se encontró una venta con esa referencia." });
+
+    venta.estadoPago = estadoPagoBold === "approved" ? "approved" : "failed";
+    await venta.save();
+
+    res.json({
+      mensaje: estadoPagoBold === "approved" ? "✅ Pago aprobado y venta finalizada." : "⚠️ Pago fallido. Venta marcada como failed.",
+      venta
+    });
+  } catch (error) {
+    console.error("❌ Error al confirmar pago:", error.message);
+    res.status(500).json({ mensaje: "No se pudo confirmar el pago. Intentá más tarde." });
+  }
+};
+
+// 3️⃣ Buscar venta por referencia
+exports.buscarPorReferencia = async (req, res) => {
+  try {
+    const { referenciaPago } = req.params;
+    const { usuarioId } = req.query;
+    if (!referenciaPago) return res.status(400).json({ mensaje: "Debe proporcionar una referencia de pago." });
+
+    const filtro = { referenciaPago };
+    if (usuarioId) filtro.usuarioId = usuarioId;
+
+    const venta = await Venta.findOne(filtro);
+    if (!venta) return res.status(404).json({ mensaje: "No se encontró una venta con esa referencia." });
+
+    res.json(venta);
+  } catch (error) {
+    console.error("❌ Error al buscar venta por referencia:", error.message);
+    res.status(500).json({ mensaje: "Error al buscar venta por referencia." });
+  }
+};
+
+// 📦 Crear venta desde microservicio de pagos (corregido)
 exports.crearVentaDesdePago = async (req, res) => {
   try {
-    const { usuarioId, productos, total, estadoPago, referenciaPago } = req.body;
-
-    if (!usuarioId || !productos?.length || !total || !referenciaPago) {
+    const { usuarioId, productos, total, referenciaPago } = req.body;
+    if (!usuarioId || !productos?.length || !total || !referenciaPago)
       return res.status(400).json({ mensaje: "Faltan datos requeridos para registrar la venta." });
-    }
 
-    // 🔹 No reducimos stock para ventas desde pago
-
+    // 🔹 Procesar productos sin reducir stock
     const productosLimpios = await Promise.all(
       productos.map(async (p) => {
         const productoId =
@@ -97,41 +109,61 @@ exports.crearVentaDesdePago = async (req, res) => {
         if (!productoId) throw new Error("ProductoId inválido en venta.");
 
         let nombreProducto = "Producto eliminado";
-        let talla = null;
-        let color = null;
-        let precioUnitario = 0;
+        let talla = p.talla || null;
+        let color = p.color || null;
+        let precioUnitario = p.precioUnitario || p.precio || 0; // Usar p.precio como fallback
+        let imagen = null;
 
         try {
           const producto = await obtenerProductoPorId(productoId);
-          nombreProducto = producto?.nombre?.trim() || nombreProducto;
+          nombreProducto = p.nombre || producto?.nombre?.trim() || nombreProducto; // Priorizar p.nombre
 
-          // 🔹 Si hay variaciónId, obtener talla, color y precio desde la variación
+          // 🔥 PRIORIDAD 1: Si viene variacionId, buscar la imagen de la variación
           if (p.variacionId && producto.variaciones?.length) {
-            const variacion = producto.variaciones.find(v => v._id === p.variacionId);
+            const variacion = producto.variaciones.find(
+              (v) => v._id.toString() === p.variacionId.toString()
+            );
             if (variacion) {
-              talla = variacion.tallaLetra || variacion.tallaNumero || null;
-              color = variacion.color || null;
-              precioUnitario = variacion.precio || producto.precio || 0;
+              // Usar datos de la variación
+              talla = variacion.tallaLetra || variacion.tallaNumero || p.atributos?.tallaLetra || null;
+              color = variacion.color || p.atributos?.color || null;
+              precioUnitario = variacion.precio || p.precio || producto.precio || 0;
+              
+              // 🔥 IMAGEN DE LA VARIACIÓN (prioridad máxima)
+              imagen = variacion.imagen || p.atributos?.imagen || null;
             }
-          } else {
-            // Si no hay variación, usamos los datos que venga o del producto
-            talla = p.talla || null;
-            color = p.color || null;
-            precioUnitario = p.precioUnitario || producto.precio || 0;
+          }
+
+          // 🔥 PRIORIDAD 2: Si no hay imagen de variación, usar la enviada desde el frontend
+          if (!imagen && p.imagen) {
+            imagen = p.imagen;
+          }
+
+          // 🔥 PRIORIDAD 3: Si no hay ninguna, usar la del producto base
+          if (!imagen) {
+            imagen = producto.imagen || producto.imagenes?.[0] || null;
           }
 
         } catch (err) {
           console.warn(`⚠️ Producto no encontrado (${productoId}): ${err.message}`);
+          
+          // Si no se pudo obtener el producto, usar datos enviados desde el frontend
+          nombreProducto = p.nombre || nombreProducto;
+          precioUnitario = p.precio || precioUnitario;
+          imagen = p.atributos?.imagen || p.imagen || null;
+          talla = p.atributos?.tallaLetra || null;
+          color = p.atributos?.color || null;
         }
 
         return {
           productoId,
           variacionId: p.variacionId || null,
           nombreProducto,
+          imagen, // Esta debería ser la imagen correcta de la variación
           talla,
           color,
           cantidad: p.cantidad || 0,
-          precioUnitario, // <-- ahora correcto
+          precioUnitario,
         };
       })
     );
@@ -140,11 +172,20 @@ exports.crearVentaDesdePago = async (req, res) => {
       usuarioId,
       productos: productosLimpios,
       total,
-      estadoPago: estadoPago?.toLowerCase() || "pendiente",
-      referenciaPago
+      estadoPago: "approved",
+      referenciaPago,
+      nombreUsuario: req.body.nombreUsuario || "Desconocido",
+      telefonoUsuario: req.body.telefonoUsuario || "",
+      direccionUsuario: req.body.direccionUsuario ? JSON.stringify(req.body.direccionUsuario) : ""
     });
 
     await nuevaVenta.save();
+
+    console.log("🔍 Productos guardados en la venta:", productosLimpios.map(p => ({
+      nombre: p.nombreProducto,
+      variacionId: p.variacionId,
+      imagen: p.imagen
+    })));
 
     res.status(201).json({
       mensaje: "✅ Venta creada exitosamente desde microservicio de pagos.",
@@ -159,24 +200,19 @@ exports.crearVentaDesdePago = async (req, res) => {
   }
 };
 
-
 // 👤 Ventas del usuario autenticado
 exports.obtenerVentasUsuario = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
     let ventas = await Venta.find({ usuarioId }).sort({ fecha: -1 });
+    if (!ventas.length) return res.status(404).json({ mensaje: "Aún no has realizado ninguna venta." });
 
-    if (!ventas.length) {
-      return res.status(404).json({ mensaje: "Aún no has realizado ninguna venta." });
-    }
-
-    ventas = await expandirVentas(ventas); // 👈 expandir aquí
+    ventas = await expandirVentas(ventas);
     res.json(ventas);
   } catch (error) {
     res.status(500).json({ mensaje: "Error al obtener tus ventas.", error: error.message });
   }
 };
-
 
 // 📊 Todas las ventas con filtros (Admin)
 exports.obtenerTodasLasVentas = async (req, res) => {
@@ -186,86 +222,14 @@ exports.obtenerTodasLasVentas = async (req, res) => {
 
     let ventas = await Venta.find(filtro).sort({ fecha: -1 });
 
-    if (usuarioId) {
-      ventas = ventas.filter((v) => v.usuarioId?.toString() === usuarioId);
-    }
+    if (usuarioId) ventas = ventas.filter(v => v.usuarioId?.toString() === usuarioId);
+    if (producto) ventas = ventas.filter(v => v.productos.some(p => p.nombreProducto?.toLowerCase().includes(producto.toLowerCase())));
+    if (!ventas.length) return res.status(404).json({ mensaje: "No hay ventas con los filtros seleccionados." });
 
-    if (producto) {
-      ventas = ventas.filter((v) =>
-        v.productos.some((p) =>
-          p.nombreProducto?.toLowerCase().includes(producto.toLowerCase())
-        )
-      );
-    }
-
-    if (!ventas.length) {
-      return res.status(404).json({ mensaje: "No hay ventas con los filtros seleccionados." });
-    }
-
-    ventas = await expandirVentas(ventas); // 👈 expandir aquí
+    ventas = await expandirVentas(ventas);
     res.json(ventas);
   } catch (error) {
     res.status(500).json({ mensaje: "Error al consultar las ventas.", error: error.message });
-  }
-};
-
-
-// 🔄 Cambiar estado de una venta (Admin)
-exports.actualizarEstadoVenta = async (req, res) => {
-  try {
-    const { estadoPago } = req.body;
-    const { id } = req.params;
-
-    const venta = await Venta.findByIdAndUpdate(id, { estadoPago }, { new: true });
-
-    if (!venta) {
-      return res.status(404).json({ mensaje: "La venta no fue encontrada." });
-    }
-
-    res.json(venta);
-  } catch (error) {
-    res.status(500).json({
-      mensaje: "Error al actualizar el estado de la venta.",
-      error: error.message,
-    });
-  }
-};
-
-// 🧾 Exportar ventas a Excel
-exports.exportarVentasExcel = async (req, res) => {
-  try {
-    const { mes, anio } = req.query;
-    const query = {};
-
-    if (mes) {
-      const year = parseInt(anio) || DateTime.now().year;
-      const month = parseInt(mes);
-      const fechaInicio = DateTime.local(year, month).startOf("month").toJSDate();
-      const fechaFin = DateTime.local(year, month).endOf("month").toJSDate();
-      query.fecha = { $gte: fechaInicio, $lte: fechaFin };
-    }
-
-    let ventas = await Venta.find(query).sort({ fecha: -1 });
-
-    if (!ventas.length) {
-      return res.status(404).json({ mensaje: "No se encontraron ventas para ese período." });
-    }
-
-    // Expande usuarios y productos antes de exportar
-    ventas = await expandirVentas(ventas);
-
-    const workbook = await generarExcelVentas(ventas);
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader("Content-Disposition", `attachment; filename=ventas.xlsx`);
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (error) {
-    console.error("Error al exportar Excel:", error);
-    res.status(500).json({ mensaje: "Error al generar el archivo Excel", error: error.message });
   }
 };
 
@@ -273,18 +237,11 @@ exports.exportarVentasExcel = async (req, res) => {
 exports.eliminarVenta = async (req, res) => {
   try {
     const { id } = req.params;
-
     const ventaEliminada = await Venta.findByIdAndDelete(id);
-
-    if (!ventaEliminada) {
-      return res.status(404).json({ mensaje: "Venta no encontrada." });
-    }
+    if (!ventaEliminada) return res.status(404).json({ mensaje: "Venta no encontrada." });
 
     res.json({ mensaje: "Venta eliminada correctamente.", venta: ventaEliminada });
   } catch (error) {
-    res.status(500).json({
-      mensaje: "Error al eliminar la venta.",
-      error: error.message,
-    });
+    res.status(500).json({ mensaje: "Error al eliminar la venta.", error: error.message });
   }
 };

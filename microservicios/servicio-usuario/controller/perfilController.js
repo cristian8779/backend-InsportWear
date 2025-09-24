@@ -144,17 +144,28 @@ const actualizarPerfil = async (req, res) => {
       });
     }
 
-    const { nombre, direccion, telefono } = req.body;
+    const { nombre, telefono, direccion } = req.body;
 
-    if (!nombre && !direccion && !telefono) {
+    if (!nombre && !telefono && !direccion) {
       return res.status(400).json({
         mensaje: "Por favor, indicá qué parte de tu perfil querés modificar.",
       });
     }
 
     if (nombre) usuario.nombre = nombre.trim();
-    if (direccion) usuario.direccion = direccion.trim();
     if (telefono) usuario.telefono = telefono.trim();
+
+    // ✅ Si llega direccion, garantizamos que sea un objeto
+    if (direccion && typeof direccion === "object") {
+      if (!usuario.direccion || typeof usuario.direccion !== "object") {
+        usuario.direccion = {}; // Resetear si estaba mal guardado como string
+      }
+
+      usuario.direccion = {
+        ...usuario.direccion.toObject?.() || usuario.direccion, // mantener lo que ya tenía
+        ...direccion, // sobreescribir con lo nuevo
+      };
+    }
 
     await usuario.save();
 

@@ -1,6 +1,14 @@
 // models/Usuario.js
 const mongoose = require('mongoose');
 
+const DireccionSchema = new mongoose.Schema({
+  departamento: { type: String, default: "" },
+  municipio: { type: String, default: "" },
+  calle: { type: String, default: "" },
+  codigoPostal: { type: String, default: "" },
+ 
+}, { _id: false }); // No necesitamos un _id para la subdirección
+
 const UsuarioSchema = new mongoose.Schema({
   nombre: {
     type: String,
@@ -8,8 +16,8 @@ const UsuarioSchema = new mongoose.Schema({
     trim: true
   },
   direccion: {
-    type: String,
-    default: ""
+    type: DireccionSchema,
+    default: () => ({})
   },
   telefono: {
     type: String,
@@ -25,12 +33,12 @@ const UsuarioSchema = new mongoose.Schema({
   },
   credenciales: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Credenciales', // Aunque el modelo no está aquí, se referencia por nombre
+    ref: 'Credenciales',
     required: true
   },
   recuperacion: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Recuperacion', // Igual, se usa solo como referencia
+    ref: 'Recuperacion',
     default: null
   }
 }, { timestamps: true });

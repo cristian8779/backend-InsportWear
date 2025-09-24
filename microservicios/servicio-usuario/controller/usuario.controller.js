@@ -135,12 +135,12 @@ const obtenerUsuarioPorCredencial = async (req, res) => {
   }
 };
 
-// ✅ Obtener usuario por ID (para microservicio de reseñas o ventas)
 const obtenerUsuarioPorId = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const usuario = await Usuario.findById(id).select("nombre imagenPerfil");
+    // Seleccionamos los campos que vamos a necesitar
+    const usuario = await Usuario.findById(id).select("nombre imagenPerfil telefono direccion");
 
     if (!usuario) {
       return res.status(404).json({ mensaje: "Usuario no encontrado" });
@@ -155,6 +155,7 @@ const obtenerUsuarioPorId = async (req, res) => {
     });
   }
 };
+
 
 // 🛠️ Actualizar datos personales del usuario (con rollback de imagen en caso de error)
 const actualizarUsuario = async (req, res) => {

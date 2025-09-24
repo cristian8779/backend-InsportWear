@@ -1,3 +1,4 @@
+// models/Venta.js
 const mongoose = require("mongoose");
 
 const productoSchema = new mongoose.Schema({
@@ -11,8 +12,11 @@ const productoSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  // 🔹 Talla y color opcionales para ventas desde pago (solo se usan si hay variación)
-  talla: { type: String, required: false },
+  imagen: { // 🔹 Campo agregado
+    type: String,
+    default: null
+  },
+  talla: { type: String, default: null },
   color: {
     type: {
       hex: { type: String },
@@ -30,12 +34,25 @@ const ventaSchema = new mongoose.Schema({
     ref: "Usuario",
     required: true
   },
+  nombreUsuario: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  telefonoUsuario: {
+    type: String,
+    default: ""
+  },
+  direccionUsuario: {
+    type: String,
+    default: ""
+  },
   productos: [productoSchema],
   total: { type: Number, required: true },
   fecha: { type: Date, default: Date.now },
   referenciaPago: {
     type: String,
-    required: false
+    required: true
   },
   estadoPago: {
     type: String,
