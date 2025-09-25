@@ -1,6 +1,17 @@
 const Historial = require('../models/Historial');
 const formatearFecha = require('../utils/formatFecha'); // ✅ Usamos el helper
 
+// 🇨🇴 Helper para obtener fecha en zona horaria de Colombia
+const obtenerFechaColombia = (fecha = new Date()) => {
+  return new Date(fecha.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+};
+
+// 🇨🇴 Helper para obtener solo la fecha (YYYY-MM-DD) en zona horaria de Colombia
+const obtenerFechaStringColombia = (fecha = new Date()) => {
+  const fechaColombia = obtenerFechaColombia(fecha);
+  return fechaColombia.toISOString().split('T')[0];
+};
+
 // 👉 Agregar producto al historial (evita duplicados por usuario y producto)
 const agregarAlHistorial = async (req, res) => {
   try {
@@ -11,20 +22,28 @@ const agregarAlHistorial = async (req, res) => {
       return res.status(400).json({ mensaje: 'Debes proporcionar el ID del producto.' });
     }
 
-    // Verificar si ya existe hoy
-    const hoy = new Date().toISOString().split('T')[0];
+    // 🇨🇴 Verificar si ya existe HOY usando la zona horaria de Colombia
+    const hoyColombia = obtenerFechaStringColombia();
     const existente = await Historial.findOne({ usuario: usuarioId, producto: productoId });
 
     if (existente) {
-      const fechaExistente = new Date(existente.fecha).toISOString().split('T')[0];
-      if (fechaExistente === hoy) {
+      // 🇨🇴 Comparar fechas usando zona horaria de Colombia
+      const fechaExistenteColombia = obtenerFechaStringColombia(existente.fecha);
+      
+      if (fechaExistenteColombia === hoyColombia) {
         return res.status(200).json({ mensaje: 'Ya se registró este producto hoy en el historial.' });
       }
 
-      existente.fecha = new Date();
+      // 🇨🇴 Actualizar con fecha/hora actual de Colombia
+      existente.fecha = obtenerFechaColombia();
       await existente.save();
     } else {
-      await Historial.create({ usuario: usuarioId, producto: productoId });
+      // 🇨🇴 Crear nuevo registro con fecha/hora de Colombia
+      await Historial.create({ 
+        usuario: usuarioId, 
+        producto: productoId,
+        fecha: obtenerFechaColombia()
+      });
     }
 
     res.status(201).json({ mensaje: 'Producto agregado al historial correctamente.' });
@@ -50,7 +69,9 @@ const obtenerHistorialAgrupadoPorFecha = async (req, res) => {
     const agrupado = {};
 
     historial.forEach(item => {
-      const claveFecha = formatearFecha(new Date(item.fecha));
+      // 🇨🇴 Usar formatearFecha con la fecha convertida a zona horaria de Colombia
+      const fechaColombia = obtenerFechaColombia(new Date(item.fecha));
+      const claveFecha = formatearFecha(fechaColombia);
 
       if (!agrupado[claveFecha]) {
         agrupado[claveFecha] = [];
@@ -122,8 +143,6 @@ const eliminarProductoDelHistorialGlobal = async (req, res) => {
     res.status(500).json({ mensaje: "No se pudo eliminar el producto de los historiales.", error: error.message });
   }
 };
-
-
 
 module.exports = {
   agregarAlHistorial,
