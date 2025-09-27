@@ -1,14 +1,15 @@
 // models/Usuario.js
 const mongoose = require('mongoose');
 
+// Subesquema de dirección
 const DireccionSchema = new mongoose.Schema({
   departamento: { type: String, default: "" },
   municipio: { type: String, default: "" },
   calle: { type: String, default: "" },
   codigoPostal: { type: String, default: "" },
- 
-}, { _id: false }); // No necesitamos un _id para la subdirección
+}, { _id: false });
 
+// Esquema principal de usuario
 const UsuarioSchema = new mongoose.Schema({
   nombre: {
     type: String,
@@ -17,7 +18,7 @@ const UsuarioSchema = new mongoose.Schema({
   },
   direccion: {
     type: DireccionSchema,
-    default: () => ({})
+    default: () => ({}) // siempre se inicializa como objeto
   },
   telefono: {
     type: String,
@@ -41,6 +42,16 @@ const UsuarioSchema = new mongoose.Schema({
     ref: 'Recuperacion',
     default: null
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true 
+});
+
+// Middleware para asegurar que direccion nunca sea primitivo
+UsuarioSchema.pre('save', function(next) {
+  if (!this.direccion || typeof this.direccion !== 'object') {
+    this.direccion = {};
+  }
+  next();
+});
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);
