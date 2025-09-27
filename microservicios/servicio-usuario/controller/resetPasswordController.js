@@ -36,6 +36,11 @@ const enviarCodigoResetPassword = async (req, res) => {
       return res.status(404).json({ mensaje: "Ocurrió un error al buscar tu perfil. Intenta de nuevo más tarde." });
     }
 
+    // ✅ Asegurarnos que direccion sea un objeto antes de guardar
+    if (!usuario.direccion || typeof usuario.direccion !== "object") {
+      usuario.direccion = {};
+    }
+
     const codigo = Math.floor(100000 + Math.random() * 900000); // Código de 6 dígitos
     const expiracion = Date.now() + 5 * 60 * 1000; // 5 minutos
 
@@ -139,15 +144,13 @@ const cambiarPasswordConCodigo = async (req, res) => {
     }
 
     // Validar seguridad de contraseña
-  const passwordRegex = /^(?=.*[A-Z\d])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
-
-if (!passwordRegex.test(password)) {
-  return res.status(400).json({
-    mensaje:
-      "La contraseña debe tener al menos 8 caracteres, una mayúscula o un número, y un símbolo especial.",
-  });
-}
-
+    const passwordRegex = /^(?=.*[A-Z\d])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    if (!passwordRegex.test(nuevaPassword)) {
+      return res.status(400).json({
+        mensaje:
+          "La contraseña debe tener al menos 8 caracteres, una mayúscula o un número, y un símbolo especial.",
+      });
+    }
 
     // Actualizar contraseña
     await axios.put(`${process.env.AUTH_SERVICE_URL}/api/auth/credencial/${usuario.credenciales}/password`, {
