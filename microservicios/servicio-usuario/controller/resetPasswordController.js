@@ -36,11 +36,6 @@ const enviarCodigoResetPassword = async (req, res) => {
       return res.status(404).json({ mensaje: "Ocurrió un error al buscar tu perfil. Intenta de nuevo más tarde." });
     }
 
-    // ✅ Asegurarnos que direccion sea un objeto antes de guardar
-    if (!usuario.direccion || typeof usuario.direccion !== "object") {
-      usuario.direccion = {};
-    }
-
     const codigo = Math.floor(100000 + Math.random() * 900000); // Código de 6 dígitos
     const expiracion = Date.now() + 5 * 60 * 1000; // 5 minutos
 
@@ -49,8 +44,8 @@ const enviarCodigoResetPassword = async (req, res) => {
     if (!recuperacion) {
       recuperacion = new Recuperacion();
       await recuperacion.save();
-      usuario.recuperacion = recuperacion._id;
-      await usuario.save();
+      // Actualizar solo el campo recuperacion sin tocar direccion
+      await Usuario.findByIdAndUpdate(usuario._id, { recuperacion: recuperacion._id });
     } else {
       // ❗ Evitar múltiples códigos activos (limpiar anteriores)
       recuperacion.codigoVerificacion = undefined;
