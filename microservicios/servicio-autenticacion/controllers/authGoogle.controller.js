@@ -8,8 +8,51 @@ require("dotenv").config();
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const loginGoogle = async (req, res) => {
+// Endpoint para verificar si un usuario existe sin crearlo
+const checkGoogleUser = async (req, res) => {
   const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({
+      mensaje: "Token requerido para verificación",
+    });
+  }
+
+  try {
+    // Verificar token de Google
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload.email?.toLowerCase().trim();
+
+    if (!email) {
+      return res.status(400).json({
+        mensaje: "No se pudo obtener el email del token",
+      });
+    }
+
+    // Verificar si existe credencial con este email
+    const credencial = await Credenciales.findOne({ email });
+    
+    return res.json({
+      exists: !!credencial,
+      email: email
+    });
+
+  } catch (error) {
+    console.error("❌ Error verificando usuario Google:", error);
+    return res.status(400).json({
+      mensaje: "Token inválido",
+      error: error.message,
+    });
+  }
+};
+
+const loginGoogle = async (req, res) => {
+  const { idToken, terminosAceptados } = req.body;
 
   if (!idToken) {
     return res.status(400).json({
@@ -37,9 +80,11 @@ const loginGoogle = async (req, res) => {
 
     let credencial = await Credenciales.findOne({ email });
     let usuario = null;
+    let esUsuarioNuevo = false;
 
     if (credencial) {
-      // 🔹 Si no tiene campo "metodo" pero su password es GOOGLE_LOGIN, lo actualizamos
+      // Usuario existente
+      // Si no tiene campo "metodo" pero su password es GOOGLE_LOGIN, lo actualizamos
       if (!credencial.metodo && credencial.password === "GOOGLE_LOGIN") {
         credencial.metodo = "google";
         await credencial.save();
@@ -60,12 +105,24 @@ const loginGoogle = async (req, res) => {
 
       usuario = respuesta.data;
     } else {
-      // 🔹 Crear nueva credencial para login con Google
+      // Usuario nuevo - verificar términos aceptados
+      esUsuarioNuevo = true;
+      
+      if (!terminosAceptados) {
+        return res.status(400).json({
+          mensaje: "Debes aceptar los términos y condiciones para crear una cuenta nueva.",
+          requiereTerminos: true
+        });
+      }
+
+      // Crear nueva credencial para login con Google
       credencial = new Credenciales({
         email,
         password: "GOOGLE_LOGIN",
         rol: "usuario",
         metodo: "google",
+        terminosAceptados: true,
+        fechaAceptacionTerminos: new Date()
       });
       await credencial.save();
 
@@ -74,20 +131,27 @@ const loginGoogle = async (req, res) => {
         nombre,
         imagenPerfil: picture,
         credenciales: credencial._id,
+        terminosAceptados: true,
+        fechaAceptacionTerminos: new Date()
       });
 
       usuario = respuesta.data;
 
-      // Enviar correo de bienvenida
-      await resend.emails.send({
-        from: "InsportWear <soporte@soportee.store>",
-        to: email,
-        subject: "¡Bienvenido a InsportWear!",
-        html: generarPlantillaBienvenida(nombre),
-      });
+      // Enviar correo de bienvenida solo para usuarios nuevos
+      try {
+        await resend.emails.send({
+          from: "InsportWear <soporte@soportee.store>",
+          to: email,
+          subject: "¡Bienvenido a InsportWear!",
+          html: generarPlantillaBienvenida(nombre),
+        });
+      } catch (emailError) {
+        console.error("⚠️ Error enviando email de bienvenida:", emailError);
+        // No fallar el registro por error de email
+      }
     }
 
-    // 🔹 Firmar tokens igual que en registrar/login
+    // Firmar tokens igual que en registrar/login
     const accessToken = jwt.sign(
       {
         id: usuario._id, // usar ID del perfil
@@ -114,10 +178,15 @@ const loginGoogle = async (req, res) => {
     credencial.refreshToken = refreshToken;
     await credencial.save();
 
+    const mensajeExito = esUsuarioNuevo 
+      ? "Registro exitoso con Google ✅ ¡Bienvenido a InsportWear!"
+      : "Inicio de sesión exitoso con Google ✅";
+
     return res.json({
-      mensaje: "Inicio de sesión exitoso con Google ✅",
+      mensaje: mensajeExito,
       accessToken,
       refreshToken,
+      esUsuarioNuevo,
       usuario: {
         nombre: usuario.nombre,
         email: credencial.email,
@@ -137,4 +206,5 @@ const loginGoogle = async (req, res) => {
 
 module.exports = {
   loginGoogle,
+  checkGoogleUser,
 };

@@ -26,6 +26,14 @@ const CredencialesSchema = new mongoose.Schema({
   refreshToken: {
     type: String,
     default: null
+  },
+  terminosAceptados: {
+    type: Boolean,
+    default: false
+  },
+  fechaAceptacionTerminos: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 
