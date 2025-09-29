@@ -109,7 +109,7 @@ npm start
 ### `routes/anuncio.routes.js`
 - Define endpoints para manejar anuncios:
   - `POST /anuncios` → Crear anuncio.
-  - `GET /anuncios` → Listar anuncios.
+  - `GET /  ` → Listar anuncios.
   - `GET /anuncios/:id` → Ver un anuncio.
   - `PUT /anuncios/:id` → Actualizar anuncio.
   - `DELETE /anuncios/:id` → Eliminar anuncio.

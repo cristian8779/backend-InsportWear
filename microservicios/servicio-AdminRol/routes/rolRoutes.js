@@ -34,7 +34,6 @@ const limitarInvitacionPendiente = require("../middlewares/limitarInvitacionPend
 router.post(
   "/invitar",
   (req, res, next) => {
-    console.log("📩 [POST] /api/rol/invitar");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -53,7 +52,6 @@ router.post(
 router.post(
   "/confirmar",
   (req, res, next) => {
-    console.log("🔑 [POST] /api/rol/confirmar");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -69,7 +67,6 @@ router.post(
 router.get(
   "/pendiente",
   (req, res, next) => {
-    console.log("⏳ [GET] /api/rol/pendiente");
     console.log("🔹 Headers:", req.headers);
     next();
   },
@@ -84,7 +81,6 @@ router.get(
 router.post(
   "/rechazar",
   (req, res, next) => {
-    console.log("🚫 [POST] /api/rol/rechazar");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -100,7 +96,6 @@ router.post(
 router.get(
   "/invitaciones",
   (req, res, next) => {
-    console.log("📜 [GET] /api/rol/invitaciones");
     console.log("🔹 Headers:", req.headers);
     next();
   },
@@ -116,7 +111,6 @@ router.get(
 router.delete(
   "/cancelar/:email",
   (req, res, next) => {
-    console.log("🛑 [DELETE] /api/rol/cancelar/:email");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Params:", req.params);
     next();
@@ -133,7 +127,6 @@ router.delete(
 router.delete(
   "/invitaciones/todas",
   (req, res, next) => {
-    console.log("⚠️ [DELETE] /api/rol/invitaciones/todas");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
 
@@ -157,7 +150,6 @@ router.delete(
 router.post(
   "/superadmin/transferir",
   (req, res, next) => {
-    console.log("👑 [POST] /api/rol/superadmin/transferir");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -171,7 +163,6 @@ router.post(
 router.post(
   "/superadmin/confirmar",
   (req, res, next) => {
-    console.log("✅ [POST] /api/rol/superadmin/confirmar");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -184,7 +175,6 @@ router.post(
 router.post(
   "/superadmin/rechazar",
   (req, res, next) => {
-    console.log("🚫 [POST] /api/rol/superadmin/rechazar");
     console.log("🔹 Headers:", req.headers);
     console.log("🔹 Body recibido:", req.body);
     next();
@@ -197,7 +187,6 @@ router.post(
 router.get(
   "/superadmin/pendiente",
   (req, res, next) => {
-    console.log("⏳ [GET] /api/rol/superadmin/pendiente");
     console.log("🔹 Headers:", req.headers);
     next();
   },

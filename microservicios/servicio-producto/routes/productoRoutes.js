@@ -64,34 +64,27 @@ router.post('/upload-imagen-producto', verificarToken, verificarAdminOsuperAdmin
 // --- 🎯 FILTROS ---
 // ✅ NUEVO endpoint separado para los filtros dinámicos
 router.get('/filtros', obtenerFiltrosDisponibles);
-console.log('Ruta GET /filtros/disponibles: Configurada para obtener filtros dinámicos disponibles (Acceso público).');
 
 
 // ➕ Crear un nuevo producto: Requiere token, permisos de admin y una imagen.
 router.post('/', verificarToken, verificarAdminOsuperAdmin, uploadProducto.single('imagen'), crearProducto);
-console.log('Ruta POST /: Configurada para crear productos (Admin requerido, con imagen).');
 
 // 📄 Obtener todos los productos: Cualquiera puede verlos.
 router.get('/', obtenerProductos);
-console.log('Ruta GET /: Configurada para obtener todos los productos (Acceso público).');
 
 // 🔍 Obtener productos por categoría: Cualquiera puede verlos.
 // Esta ruta debe ir antes de '/:id' para que Express no confunda 'por-categoria' con un ID.
 router.get('/por-categoria/:id', obtenerProductosPorCategoria);
-console.log('Ruta GET /por-categoria/:id: Configurada para obtener productos por categoría (Acceso público).');
 
 // 👁️ Obtener un producto por su ID: Cualquiera puede ver los detalles de un producto específico.
 // Esta debe ir después de las rutas más específicas para evitar conflictos.
 router.get('/:id', obtenerProductoPorId);
-console.log('Ruta GET /:id: Configurada para obtener un producto específico por ID (Acceso público).');
 
 // 🔄 Actualizar un producto existente: Requiere token, permisos de admin y una imagen (opcional).
 router.put('/:id', verificarToken, verificarAdminOsuperAdmin, uploadProducto.single('imagen'), actualizarProducto);
-console.log('Ruta PUT /:id: Configurada para actualizar productos (Admin requerido, imagen opcional).');
 
 // 🗑️ Eliminar un producto: Requiere token y permisos de admin.
 router.delete('/:id', verificarToken, verificarAdminOsuperAdmin, eliminarProducto);
-console.log('Ruta DELETE /:id: Configurada para eliminar productos (Admin requerido).');
 
 // ---
 // 📉 Rutas para el Stock del Producto Principal
@@ -104,7 +97,6 @@ console.log('Ruta DELETE /:id: Configurada para eliminar productos (Admin requer
 // o se integran de forma segura de otra manera. Si tu microservicio de ventas NO usa token, déjalo así.
 // Si SÍ usa token, puedes añadir 'verificarToken'.
 router.put('/:id/reducir-stock', reducirStock);
-console.log('Ruta PUT /:id/reducir-stock: Configurada para reducir stock del producto principal (Ideal para microservicios).');
 
 
 // ---
@@ -115,23 +107,18 @@ console.log('Ruta PUT /:id/reducir-stock: Configurada para reducir stock del pro
 
 // ➕ Agregar una variación a un producto: Requiere token, permisos de admin y permite múltiples imágenes.
 router.post('/:productoId/variaciones', verificarToken, verificarAdminOsuperAdmin, uploadVariaciones, agregarVariacion);
-console.log('Ruta POST /:productoId/variaciones: Configurada para añadir variaciones (Admin requerido, soporta múltiples imágenes).');
 
 // 📄 Obtener todas las variaciones de un producto: Cualquiera puede verlas y filtrarlas.
 router.get('/:productoId/variaciones', obtenerVariaciones);
-console.log('Ruta GET /:productoId/variaciones: Configurada para obtener y filtrar variaciones (Acceso público).');
 
 // 🔄 Actualizar una variación específica de un producto: Requiere token, permisos de admin, soporta imágenes.
 router.put('/:productoId/variaciones/:id', verificarToken, verificarAdminOsuperAdmin, uploadVariaciones, actualizarVariacion);
-console.log('Ruta PUT /:productoId/variaciones/:id: Configurada para actualizar variaciones (Admin requerido, soporta imágenes).');
 
 // 🗑️ Eliminar una variación específica de un producto: Requiere token y permisos de admin.
 router.delete('/:productoId/variaciones/:id', verificarToken, verificarAdminOsuperAdmin, eliminarVariacion);
-console.log('Ruta DELETE /:productoId/variaciones/:id: Configurada para eliminar variaciones (Admin requerido).');
 
 // 📉 Reducir stock de una variación específica: No requiere admin.
 router.put('/:productoId/variaciones/:id/reducir-stock', reducirStockVariacion);
-console.log('Ruta PUT /:productoId/variaciones/:id/reducir-stock: Configurada para reducir stock de una variación específica (Ideal para microservicios/carrito).');
 
 // Nueva ruta para agregar una variación a un producto
 
