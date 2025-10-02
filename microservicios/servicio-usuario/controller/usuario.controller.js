@@ -65,15 +65,24 @@ const crearUsuario = async (req, res) => {
       });
     }
 
-    const nuevoUsuario = new Usuario({
-  nombre: nombre.trim(),
-  direccion: direccion?.trim() || "",
-  telefono: telefono?.trim() || "",
-  imagenPerfil: req.file?.path || req.body.imagenPerfil || "",
-  public_id: req.file?.filename || "",
-  credenciales: credenciales.trim(),
-});
+    // Construir objeto de datos del usuario
+    const datosUsuario = {
+      nombre: nombre.trim(),
+      telefono: telefono?.trim() || "",
+      imagenPerfil: req.file?.path || req.body.imagenPerfil || "",
+      public_id: req.file?.filename || "",
+      credenciales: credenciales.trim(),
+    };
 
+    // Solo agregar direccion si existe y no está vacía
+    if (direccion && typeof direccion === 'object') {
+      datosUsuario.direccion = direccion;
+    } else if (direccion && typeof direccion === 'string' && direccion.trim()) {
+      // Si viene como string (no debería), intentar parsearlo o ignorarlo
+      console.warn('⚠️ direccion recibida como string, se ignorará');
+    }
+
+    const nuevoUsuario = new Usuario(datosUsuario);
 
     // Intentar guardar en la base de datos
     await nuevoUsuario.save();
@@ -156,7 +165,6 @@ const obtenerUsuarioPorId = async (req, res) => {
   }
 };
 
-
 // 🛠️ Actualizar datos personales del usuario (con rollback de imagen en caso de error)
 const actualizarUsuario = async (req, res) => {
   let nuevaImagenSubida = null; // Para tracking de rollback
@@ -193,8 +201,16 @@ const actualizarUsuario = async (req, res) => {
 
     // Actualizar campos básicos
     if (nombre && nombre.trim()) usuario.nombre = nombre.trim();
-    if (direccion !== undefined) usuario.direccion = direccion?.trim() || "";
     if (telefono !== undefined) usuario.telefono = telefono?.trim() || "";
+    
+    // Actualizar direccion solo si es un objeto válido
+    if (direccion !== undefined) {
+      if (typeof direccion === 'object' && direccion !== null) {
+        usuario.direccion = direccion;
+      } else if (typeof direccion === 'string' && direccion.trim()) {
+        console.warn('⚠️ direccion recibida como string en actualización, se ignorará');
+      }
+    }
 
     // Si hay nueva imagen, actualizar los campos de imagen
     if (req.file?.path) {
