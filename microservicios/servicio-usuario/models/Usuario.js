@@ -18,7 +18,13 @@ const UsuarioSchema = new mongoose.Schema({
   },
   direccion: {
     type: DireccionSchema,
-    default: () => ({}) // siempre se inicializa como objeto
+    required: false, // ✅ Explícitamente opcional
+    default: () => ({ // ✅ Retorna objeto completo con todos los campos
+      departamento: "",
+      municipio: "",
+      calle: "",
+      codigoPostal: ""
+    })
   },
   telefono: {
     type: String,
@@ -42,14 +48,19 @@ const UsuarioSchema = new mongoose.Schema({
     ref: 'Recuperacion',
     default: null
   }
-}, { 
-  timestamps: true 
+}, {
+  timestamps: true
 });
 
 // Middleware para asegurar que direccion nunca sea primitivo
 UsuarioSchema.pre('save', function(next) {
   if (!this.direccion || typeof this.direccion !== 'object') {
-    this.direccion = {};
+    this.direccion = {
+      departamento: "",
+      municipio: "",
+      calle: "",
+      codigoPostal: ""
+    };
   }
   next();
 });
