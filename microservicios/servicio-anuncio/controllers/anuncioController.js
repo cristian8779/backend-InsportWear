@@ -70,11 +70,12 @@ const obtenerTodos = async (req, res) => {
                 fechaFin: { $lt: hoy },
             };
         } else if (estado === 'programado') {
-            const hoy = moment().tz("America/Bogota").startOf('day').toDate();
-            filtro = {
-                fechaInicio: { $gt: hoy },
-            };
-        }
+    const ahora = new Date(); // hora exacta del momento
+    filtro = {
+        fechaInicio: { $gt: ahora },
+    };
+}
+
 
         const anuncios = await Anuncio.find(filtro)
             .sort({ createdAt: -1 })
