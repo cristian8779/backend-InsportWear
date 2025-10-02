@@ -6,7 +6,10 @@ const generarPlantillaBienvenida = require("../utils/plantillaBienvenida");
 const resend = require("../config/resend");
 require("dotenv").config();
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// ✅ CRITICAL: Debe coincidir con Flutter (GOOGLE_CLIENT_ID_WEB)
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID_WEB);
+
+console.log('🔑 Google Client ID configurado:', process.env.GOOGLE_CLIENT_ID_WEB ? 'SI' : 'NO');
 
 // Endpoint para verificar si un usuario existe sin crearlo
 const checkGoogleUser = async (req, res) => {
@@ -22,7 +25,7 @@ const checkGoogleUser = async (req, res) => {
     // Verificar token de Google
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID_WEB, // ✅ Usar la misma variable
     });
 
     const payload = ticket.getPayload();
@@ -61,13 +64,19 @@ const loginGoogle = async (req, res) => {
   }
 
   try {
-    // Verificar token de Google
+    console.log('🔍 Verificando token de Google...');
+    console.log('Token (primeros 30):', idToken.substring(0, 30));
+    console.log('Client ID usado:', process.env.GOOGLE_CLIENT_ID_WEB);
+    
+    // ✅ Verificar token de Google con la variable correcta
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID_WEB, // ✅ CRITICAL: Debe coincidir con Flutter
     });
 
     const payload = ticket.getPayload();
+    console.log('✅ Token verificado exitosamente para:', payload.email);
+    
     const email = payload.email?.toLowerCase().trim();
     const nombre = payload.name || "Usuario";
     const picture = payload.picture || "";
@@ -84,6 +93,8 @@ const loginGoogle = async (req, res) => {
 
     if (credencial) {
       // Usuario existente
+      console.log('👤 Usuario existente encontrado:', email);
+      
       // Si no tiene campo "metodo" pero su password es GOOGLE_LOGIN, lo actualizamos
       if (!credencial.metodo && credencial.password === "GOOGLE_LOGIN") {
         credencial.metodo = "google";
@@ -107,13 +118,17 @@ const loginGoogle = async (req, res) => {
     } else {
       // Usuario nuevo - verificar términos aceptados
       esUsuarioNuevo = true;
+      console.log('🆕 Usuario nuevo detectado:', email);
       
       if (!terminosAceptados) {
+        console.log('⚠️ Términos no aceptados, solicitando aceptación');
         return res.status(400).json({
           mensaje: "Debes aceptar los términos y condiciones para crear una cuenta nueva.",
           requiereTerminos: true
         });
       }
+
+      console.log('✅ Términos aceptados, creando nueva cuenta...');
 
       // Crear nueva credencial para login con Google
       credencial = new Credenciales({
@@ -136,6 +151,7 @@ const loginGoogle = async (req, res) => {
       });
 
       usuario = respuesta.data;
+      console.log('✅ Usuario creado exitosamente:', usuario._id);
 
       // Enviar correo de bienvenida solo para usuarios nuevos
       try {
@@ -145,6 +161,7 @@ const loginGoogle = async (req, res) => {
           subject: "¡Bienvenido a InsportWear!",
           html: generarPlantillaBienvenida(nombre),
         });
+        console.log('📧 Email de bienvenida enviado');
       } catch (emailError) {
         console.error("⚠️ Error enviando email de bienvenida:", emailError);
         // No fallar el registro por error de email
@@ -182,8 +199,11 @@ const loginGoogle = async (req, res) => {
       ? "Registro exitoso con Google ✅ ¡Bienvenido a InsportWear!"
       : "Inicio de sesión exitoso con Google ✅";
 
+    console.log('✅ Login Google completado exitosamente');
+
     return res.json({
       mensaje: mensajeExito,
+      token: accessToken, // ✅ También enviar como "token" para compatibilidad
       accessToken,
       refreshToken,
       esUsuarioNuevo,
@@ -195,7 +215,9 @@ const loginGoogle = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error verificando token de Google:", error);
+    console.error("❌ Error completo en loginGoogle:", error);
+    console.error("Stack trace:", error.stack);
+    
     return res.status(401).json({
       mensaje:
         "No pudimos iniciar sesión con Google. El token no es válido o ha expirado. Intenta nuevamente.",
