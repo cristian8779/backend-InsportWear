@@ -8,26 +8,45 @@ const crearResena = async (req, res) => {
     const { productoId } = req.params;
     const { comentario, calificacion } = req.body;
 
+    // Validaciones básicas
     if (!comentario || !calificacion) {
       return res.status(400).json({ mensaje: 'Por favor, completa el comentario y la calificación.' });
     }
 
     if (calificacion < 1 || calificacion > 5) {
-      return res.status(400).json({ mensaje: 'La calificación debe ser un número entre 1 y 5 estrellas.' });
+      return res.status(400).json({ mensaje: 'La calificación debe ser entre 1 y 5 estrellas.' });
     }
 
     const producto = await Producto.findById(productoId);
     if (!producto) {
-      return res.status(404).json({ mensaje: 'El producto que estás intentando calificar no existe.' });
+      return res.status(404).json({ mensaje: 'El producto no existe.' });
     }
 
     const existe = await Resena.findOne({ usuario: req.usuario.id, producto: productoId });
     if (existe) {
-      return res.status(400).json({ mensaje: 'Ya has dejado una reseña para este producto. Solo puedes dejar una reseña.' });
+      return res.status(400).json({ mensaje: 'Ya has dejado una reseña para este producto.' });
     }
 
+    // 🔹 Intentamos obtener el nombre e imagen del usuario actual
+    let usuarioNombre = "Usuario desconocido";
+    let usuarioImagen = "";
+
+    try {
+      const respuesta = await axios.get(`${process.env.USUARIO_SERVICE_URL}/api/usuario/${req.usuario.id}`);
+      const data = respuesta.data;
+      
+      // Los datos están dentro de data.usuario
+      usuarioNombre = data.usuario?.nombre || usuarioNombre;
+      usuarioImagen = data.usuario?.imagenPerfil || usuarioImagen;
+    } catch (err) {
+      console.warn("⚠️ No se pudo obtener info del usuario:", err.message);
+    }
+
+    // 🔹 Creamos la reseña guardando también el nombre y la imagen
     const nuevaResena = new Resena({
       usuario: req.usuario.id,
+      usuarioNombre,
+      usuarioImagen,
       producto: productoId,
       comentario,
       calificacion
@@ -41,47 +60,46 @@ const crearResena = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      mensaje: 'Ocurrió un error al enviar tu reseña. Inténtalo más tarde.',
+      mensaje: 'Ocurrió un error al enviar tu reseña.',
       error: error.message
     });
   }
 };
 
-// Obtener todas las reseñas de un producto
+
 const obtenerResenasPorProducto = async (req, res) => {
   try {
     const { productoId } = req.params;
-
+    
     const resenas = await Resena.find({ producto: productoId }).sort({ fecha: -1 });
 
     const resenasConUsuario = await Promise.all(
       resenas.map(async (resena) => {
         let usuario = { nombre: "Usuario desconocido", imagenPerfil: "" };
-
+        
         try {
-          const response = await axios.get(`${process.env.USUARIO_SERVICE_URL}/api/usuario/${resena.usuario}`);
-          const data = response.data;
-
+          const { data } = await axios.get(
+            `${process.env.USUARIO_SERVICE_URL}/api/usuario/${resena.usuario}`
+          );
+          
+          // Los datos están dentro de data.usuario
           usuario = {
-            nombre: data.nombre,
-            imagenPerfil: data.imagenPerfil || ""
+            nombre: data.usuario?.nombre || "Sin nombre",
+            imagenPerfil: data.usuario?.imagenPerfil || ""
           };
-        } catch (err) {
-          // Se ignora el error, usuario queda como desconocido
+        } catch (error) {
+          console.warn(`⚠️ No se pudo obtener info del usuario ${resena.usuario}`);
         }
 
-        return {
-          ...resena.toObject(),
-          usuario
-        };
+        return { ...resena.toObject(), usuario };
       })
     );
 
     res.json({ mensaje: 'Reseñas cargadas correctamente', resenas: resenasConUsuario });
   } catch (error) {
-    res.status(500).json({
-      mensaje: 'No pudimos obtener las reseñas en este momento. Intenta nuevamente más tarde.',
-      error: error.message
+    res.status(500).json({ 
+      mensaje: 'No pudimos obtener las reseñas en este momento. Intenta nuevamente más tarde.', 
+      error: error.message 
     });
   }
 };
@@ -123,11 +141,15 @@ const actualizarResena = async (req, res) => {
 // Eliminar reseña del usuario actual
 const eliminarResena = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, productoId } = req.params;
 
     const resena = await Resena.findById(id);
     if (!resena) {
       return res.status(404).json({ mensaje: 'La reseña que intentas eliminar no existe.' });
+    }
+
+    if (resena.producto.toString() !== productoId) {
+      return res.status(400).json({ mensaje: 'La reseña no pertenece a este producto.' });
     }
 
     if (resena.usuario.toString() !== req.usuario.id) {

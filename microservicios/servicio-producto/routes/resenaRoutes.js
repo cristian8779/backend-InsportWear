@@ -20,6 +20,7 @@ router.get('/producto/:productoId', obtenerResenasPorProducto);
 router.put('/id/:id', verificarToken, actualizarResena);
 
 // Eliminar reseña por ID
-router.delete('/id/:id', verificarToken, eliminarResena);
+router.delete('/producto/:productoId/:id', verificarToken, eliminarResena);
+
 
 module.exports = router;
