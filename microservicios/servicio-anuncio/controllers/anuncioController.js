@@ -1,5 +1,5 @@
 const axios = require("axios");
-const Anuncio = require("../models/Anuncio"); // ✅ Sin .js
+const Anuncio = require("../models/Anuncio");
 const cloudinary = require("../config/cloudinary");
 const moment = require("moment-timezone");
 
@@ -23,11 +23,14 @@ const limpiarImagenCloudinary = async (publicId, contexto = "") => {
 // ✅ Obtener hasta 5 anuncios activos por fecha
 const obtenerActivos = async (req, res) => {
     try {
-        const hoy = moment().tz("America/Bogota").startOf('day').toDate();
+        const inicioDiaBogota = moment().tz("America/Bogota").startOf('day').toDate();
+        const finDiaBogota = moment().tz("America/Bogota").endOf('day').toDate();
+        
         const activos = await Anuncio.find({
-            fechaInicio: { $lte: hoy },
-            fechaFin: { $gte: hoy },
+            fechaInicio: { $lte: finDiaBogota },
+            fechaFin: { $gte: inicioDiaBogota },
         }).limit(5);
+        
         res.json(activos);
     } catch (error) {
         console.error("❌ Error al obtener anuncios:", error);
@@ -39,49 +42,107 @@ const obtenerActivos = async (req, res) => {
 
 // ✅ Obtener todos los anuncios (para administración)
 const obtenerTodos = async (req, res) => {
+    console.log("🚀 obtenerTodos llamado");
+    console.log("📥 Query params:", req.query);
+    console.log("👤 Usuario:", req.usuario);
+    
     try {
         const { rol } = req.usuario;
 
         if (!["admin", "superAdmin"].includes(rol)) {
+            console.log("❌ Usuario sin permisos:", rol);
             return res.status(403).json({
                 error: "No tienes permisos para ver todos los anuncios.",
             });
         }
 
+        console.log("✅ Permisos verificados para:", rol);
+
         const { page = 1, limit = 10, estado } = req.query;
         const opciones = {
             page: parseInt(page),
-            limit: parseInt(limit),
-            sort: { createdAt: -1 }
+            limit: parseInt(limit)
         };
 
         let filtro = {};
-        
-        // Filtrar por estado si se especifica
+        let orden = { createdAt: -1 };
+
+        // 🔧 CRÍTICO: Crear fechas en Bogotá y dejar que se conviertan a UTC automáticamente
+        const ahora = moment().tz("America/Bogota");
+        const inicioDiaBogota = ahora.clone().startOf('day').toDate(); // 2 oct 00:00 Bogotá → 2 oct 05:00 UTC
+        const finDiaBogota = ahora.clone().endOf('day').toDate();       // 2 oct 23:59 Bogotá → 3 oct 04:59 UTC
+
+        console.log("🕐 Debug fechas:", {
+            ahoraLocal: ahora.format('YYYY-MM-DD HH:mm:ss Z'),
+            inicioDiaLocal: moment(inicioDiaBogota).tz("America/Bogota").format('YYYY-MM-DD HH:mm:ss Z'),
+            finDiaLocal: moment(finDiaBogota).tz("America/Bogota").format('YYYY-MM-DD HH:mm:ss Z'),
+            inicioDiaUTC: moment(inicioDiaBogota).utc().format('YYYY-MM-DD HH:mm:ss Z'),
+            finDiaUTC: moment(finDiaBogota).utc().format('YYYY-MM-DD HH:mm:ss Z'),
+            inicioDiaISO: inicioDiaBogota.toISOString(),
+            finDiaISO: finDiaBogota.toISOString()
+        });
+
         if (estado === 'activo') {
-            const hoy = moment().tz("America/Bogota").startOf('day').toDate();
             filtro = {
-                fechaInicio: { $lte: hoy },
-                fechaFin: { $gte: hoy },
+                fechaInicio: { $lte: finDiaBogota },
+                fechaFin: { $gte: inicioDiaBogota },
             };
         } else if (estado === 'expirado') {
-            const hoy = moment().tz("America/Bogota").startOf('day').toDate();
             filtro = {
-                fechaFin: { $lt: hoy },
+                fechaFin: { $lt: inicioDiaBogota },
             };
         } else if (estado === 'programado') {
-            const hoy = moment().tz("America/Bogota").startOf('day').toDate();
             filtro = {
-                fechaInicio: { $gt: hoy },
+                fechaInicio: { $gt: finDiaBogota },
             };
+            orden = { fechaInicio: 1 };
+            
+            // 🔍 DEBUG EXTRA para programados
+            console.log("🔍 DEBUG PROGRAMADO:");
+            console.log("   finDiaBogota (Date):", finDiaBogota);
+            console.log("   finDiaBogota (ISO):", finDiaBogota.toISOString());
+            
+            // Probar consulta directa
+            const testQuery = await Anuncio.find({
+                fechaInicio: { $gt: finDiaBogota }
+            });
+            console.log("   Anuncios con fechaInicio > finDiaBogota:", testQuery.length);
+            if (testQuery.length > 0) {
+                console.log("   Primer anuncio encontrado:", {
+                    id: testQuery[0]._id,
+                    fechaInicio: testQuery[0].fechaInicio,
+                    fechaInicioISO: testQuery[0].fechaInicio.toISOString()
+                });
+            }
+            
+            // Listar TODOS los anuncios para ver qué hay
+            const todosLosAnuncios = await Anuncio.find({}).select('fechaInicio fechaFin');
+            console.log("   📊 TODOS los anuncios en BD:", todosLosAnuncios.map(a => ({
+                id: a._id,
+                inicio: a.fechaInicio.toISOString(),
+                fin: a.fechaFin.toISOString()
+            })));
         }
 
         const anuncios = await Anuncio.find(filtro)
-            .sort({ createdAt: -1 })
+            .sort(orden)
             .limit(opciones.limit)
             .skip((opciones.page - 1) * opciones.limit);
 
         const total = await Anuncio.countDocuments(filtro);
+
+        // 📊 Debug detallado
+        console.log(`📋 Estado solicitado: ${estado}`);
+        console.log(`📋 Filtro aplicado:`, JSON.stringify(filtro, null, 2));
+        console.log(`📋 Anuncios encontrados: ${anuncios.length}, Total: ${total}`);
+        
+        if (anuncios.length > 0) {
+            console.log(`📋 Primer anuncio:`, {
+                id: anuncios[0]._id,
+                fechaInicio: anuncios[0].fechaInicio,
+                fechaFin: anuncios[0].fechaFin
+            });
+        }
 
         res.json({
             anuncios,
@@ -107,7 +168,6 @@ const crearAnuncio = async (req, res) => {
 
         // 🔒 Validación de permisos ANTES de procesar imagen
         if (!["admin", "superAdmin"].includes(rol)) {
-            // Limpiar imagen si no tiene permisos
             if (req.file?.filename) {
                 await limpiarImagenCloudinary(req.file.filename, "- error de permisos");
             }
@@ -176,20 +236,17 @@ const crearAnuncio = async (req, res) => {
 
         const anuncioExistente = await Anuncio.findOne(filtroSolapado);
         if (anuncioExistente) {
-            // Rollback: eliminar imagen si ya existe anuncio
             await limpiarImagenCloudinary(imagenSubida, "- anuncio duplicado en fechas");
             return res.status(409).json({
                 error: "Ya existe un anuncio activo para ese producto o categoría en ese rango de fechas.",
             });
         }
 
-        // 🔗 Validar que el producto/categoría exista (opcional pero recomendado)
+        // 🔗 Validar que el producto/categoría exista
         if (productoId) {
             try {
-                // Verificar que el producto existe en el microservicio
                 const productos = await obtenerProductos();
                 const productoExiste = productos.some(p => p._id === productoId);
-                
                 if (!productoExiste) {
                     await limpiarImagenCloudinary(imagenSubida, "- producto no encontrado");
                     return res.status(404).json({
@@ -198,16 +255,13 @@ const crearAnuncio = async (req, res) => {
                 }
             } catch (err) {
                 console.warn("⚠️ No se pudo verificar la existencia del producto:", err.message);
-                // Continuar sin validar si el servicio no está disponible
             }
         }
 
         if (categoriaId) {
             try {
-                // Verificar que la categoría existe en el microservicio
                 const categorias = await obtenerCategorias();
                 const categoriaExiste = categorias.some(c => c._id === categoriaId);
-                
                 if (!categoriaExiste) {
                     await limpiarImagenCloudinary(imagenSubida, "- categoría no encontrada");
                     return res.status(404).json({
@@ -216,7 +270,6 @@ const crearAnuncio = async (req, res) => {
                 }
             } catch (err) {
                 console.warn("⚠️ No se pudo verificar la existencia de la categoría:", err.message);
-                // Continuar sin validar si el servicio no está disponible
             }
         }
 
@@ -238,43 +291,34 @@ const crearAnuncio = async (req, res) => {
         });
 
         await anuncio.save();
-        
-        // ✅ Si llegamos aquí, todo salió bien - no hacer rollback
-        imagenSubida = null;
-        
+        imagenSubida = null; // ✅ ya no hacer rollback
+
         console.log(`✅ Anuncio creado exitosamente: ${anuncio._id}`);
         res.status(201).json(anuncio);
 
     } catch (error) {
         console.error("❌ Error interno al crear el anuncio:", error);
-        
-        // 🧹 ROLLBACK: Eliminar imagen de Cloudinary si algo falló
         if (imagenSubida) {
             await limpiarImagenCloudinary(imagenSubida, "- error interno en creación");
         }
-        
-        // Verificar si el error es por un duplicado de MongoDB
         if (error.code === 11000) {
             return res.status(409).json({
                 error: "Ya existe un anuncio con características similares.",
             });
         }
-        
-        // Error de validación de MongoDB
         if (error.name === 'ValidationError') {
             const errores = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({
                 error: `Errores de validación: ${errores.join(', ')}`,
             });
         }
-        
         res.status(500).json({
             error: "No se pudo crear el anuncio por un problema interno. Intenta nuevamente más tarde.",
         });
     }
 };
 
-// ✅ Eliminar anuncio (sin cambios, ya está bien)
+// ✅ Eliminar anuncio
 const eliminarAnuncio = async (req, res) => {
     try {
         const { rol } = req.usuario;
@@ -292,7 +336,6 @@ const eliminarAnuncio = async (req, res) => {
             });
         }
 
-        // Eliminar imagen de Cloudinary
         if (anuncio.publicId) {
             await limpiarImagenCloudinary(anuncio.publicId, "- eliminación de anuncio");
         }
@@ -336,22 +379,19 @@ const obtenerCategoriasDesdeServicio = async (req, res) => {
     }
 };
 
-// 🚨 Eliminar anuncios por productoId (para cuando se borra un producto)
+// 🚨 Eliminar anuncios por productoId
 const eliminarAnunciosPorProducto = async (req, res) => {
     try {
         const { productoId } = req.params;
 
-        // Buscar anuncios relacionados
         const anuncios = await Anuncio.find({ productoId });
 
-        // Eliminar imágenes en Cloudinary asociadas a esos anuncios
         for (const anuncio of anuncios) {
             if (anuncio.publicId) {
                 await limpiarImagenCloudinary(anuncio.publicId, "- eliminación masiva por producto");
             }
         }
 
-        // Eliminar anuncios en DB
         await Anuncio.deleteMany({ productoId });
 
         console.log(`✅ Se eliminaron los anuncios relacionados con el producto ${productoId}`);
@@ -362,8 +402,6 @@ const eliminarAnunciosPorProducto = async (req, res) => {
         res.status(500).json({ error: "No se pudieron eliminar los anuncios relacionados a este producto." });
     }
 };
-
-
 
 module.exports = {
     obtenerActivos,

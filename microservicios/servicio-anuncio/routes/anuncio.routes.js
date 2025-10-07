@@ -1,24 +1,23 @@
 const router = require("express").Router();
 const auth = require("../middlewares/auth");
 const ctrl = require("../controllers/anuncioController");
-const uploadAnuncio = require('../middlewares/uploadAnuncio'); // Middleware para subir imágenes
+const uploadAnuncio = require('../middlewares/uploadAnuncio');
 
-// ✅ Obtener anuncios activos (público) - Ruta principal
-router.get("/", ctrl.obtenerActivos);
-
-// ✅ Obtener todos los anuncios (admin) - NUEVA RUTA
-router.get("/admin/todos", auth, ctrl.obtenerTodos);
-
-// ✅ Obtener hasta 3 anuncios activos (público) - Ruta alternativa
+// ✅ RUTAS PÚBLICAS
+// Obtener anuncios activos para mostrar en la app
 router.get("/activos", ctrl.obtenerActivos);
 
-// ✅ Crear anuncio (requiere auth y subida de imagen) - MEJORADO
+// ✅ RUTAS DE ADMINISTRACIÓN (requieren autenticación)
+// Obtener todos los anuncios con filtros (activo, programado, expirado)
+router.get("/", auth, ctrl.obtenerTodos);
+
+// Crear anuncio (requiere auth y subida de imagen)
 router.post("/", auth, uploadAnuncio.single("imagen"), ctrl.crearAnuncio);
 
-// ✅ Eliminar anuncio (requiere auth)
+// Eliminar anuncio (requiere auth)
 router.delete("/:id", auth, ctrl.eliminarAnuncio);
 
-// ✅ Listar productos y categorías (uso interno o admin panel)
+// ✅ RUTAS PARA OBTENER PRODUCTOS Y CATEGORÍAS
 router.get("/productos", ctrl.obtenerProductos);
 router.get("/categorias", ctrl.obtenerCategorias);
 
