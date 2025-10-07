@@ -75,20 +75,28 @@ const obtenerResenasPorProducto = async (req, res) => {
 
     const resenasConUsuario = await Promise.all(
       resenas.map(async (resena) => {
-        let usuario = { nombre: "Usuario desconocido", imagenPerfil: "" };
+        // 🔹 Primero usar los datos guardados en la reseña
+        let usuario = {
+          nombre: resena.usuarioNombre || "Usuario desconocido",
+          imagenPerfil: resena.usuarioImagen || ""
+        };
         
-        try {
-          const { data } = await axios.get(
-            `${process.env.USUARIO_SERVICE_URL}/api/usuario/${resena.usuario}`
-          );
-          
-          // Los datos están dentro de data.usuario
-          usuario = {
-            nombre: data.usuario?.nombre || "Sin nombre",
-            imagenPerfil: data.usuario?.imagenPerfil || ""
-          };
-        } catch (error) {
-          console.warn(`⚠️ No se pudo obtener info del usuario ${resena.usuario}`);
+        // 🔹 Si los datos guardados están vacíos o son "Usuario desconocido", 
+        // intentamos obtenerlos del microservicio como respaldo
+        if (!resena.usuarioNombre || resena.usuarioNombre === "Usuario desconocido") {
+          try {
+            const { data } = await axios.get(
+              `${process.env.USUARIO_SERVICE_URL}/api/usuario/${resena.usuario}`
+            );
+            
+            // Los datos están dentro de data.usuario
+            usuario = {
+              nombre: data.usuario?.nombre || usuario.nombre,
+              imagenPerfil: data.usuario?.imagenPerfil || usuario.imagenPerfil
+            };
+          } catch (error) {
+            console.warn(`⚠️ No se pudo obtener info del usuario ${resena.usuario}`);
+          }
         }
 
         return { ...resena.toObject(), usuario };
