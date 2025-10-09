@@ -3,6 +3,8 @@ const cloudinary = require('../config/cloudinary');
 const Historial = require('../models/Historial');
 const axios = require('axios');
 const redisClient = require('../config/redis');
+const Resena = require('../models/Resena');
+
 
 // 📦 Crear un producto (con rollback de imagen en caso de error)
 const crearProducto = async (req, res) => {
@@ -554,117 +556,48 @@ const actualizarProducto = async (req, res) => {
     }
 };
 
-// 🗑️ Eliminar un producto (mejorado con limpieza de carritos, favoritos, anuncios e historial)
+// 🗑️ Eliminar un producto (mejorado con limpieza de reseñas)
 const eliminarProducto = async (req, res) => {
-    try {
-        if (!['admin', 'superAdmin'].includes(req.usuario.rol)) {
-            return res.status(403).json({ mensaje: '⛔ No tienes permisos para eliminar productos.' });
-        }
-
-        const { id } = req.params;
-        const producto = await Producto.findById(id).populate('variaciones');
-        if (!producto) {
-            return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
-        }
-
-        // 🗑 Eliminar imágenes de variaciones (si existen)
-        if (producto.variaciones?.length > 0) {
-            console.log(`🗑️ Preparando para eliminar imágenes de ${producto.variaciones.length} variaciones de Cloudinary.`);
-            for (const variacion of producto.variaciones) {
-                if (variacion.imagen?.public_id) {
-                    await cloudinary.uploader.destroy(variacion.imagen.public_id);
-                    console.log(`   - 🗑️ Imagen de variación eliminada: ${variacion.imagen.public_id}`);
-                }
-                if (variacion.imagenes?.length) {
-                    for (const img of variacion.imagenes) {
-                        if (img.public_id) {
-                            await cloudinary.uploader.destroy(img.public_id);
-                            console.log(`   - 🗑️ Imagen de variación eliminada (modelo anterior): ${img.public_id}`);
-                        }
-                    }
-                }
-            }
-            console.log("👍 Todas las imágenes de variaciones han sido eliminadas de Cloudinary.");
-        }
-
-        // 🗑 Eliminar imagen principal
-        if (producto.public_id) {
-            await cloudinary.uploader.destroy(producto.public_id);
-            console.log(`🗑️ Imagen principal eliminada: ${producto.public_id}`);
-        }
-
-        // 🗑 Eliminar el producto de la base de datos
-        await Producto.findByIdAndDelete(id);
-
-        // 📜 Eliminar del historial (directo porque está en el mismo servicio)
-        const resultadoHistorial = await Historial.deleteMany({ producto: id });
-        console.log(`📜 Producto eliminado de ${resultadoHistorial.deletedCount} entradas del historial.`);
-
-        // 🔗 Notificar al microservicio de ANUNCIOS
-        if (process.env.ANUNCIO_SERVICE_URL) {
-            try {
-                const anuncioResp = await axios.delete(
-                    `${process.env.ANUNCIO_SERVICE_URL}/api/anuncios/producto/${id}`,
-                    { 
-                        timeout: 5000,
-                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
-                    }
-                );
-                console.log(`📢 Anuncios eliminados: ${anuncioResp.data?.mensaje || 'OK'}`);
-            } catch (err) {
-                console.warn(`⚠️ No se pudieron eliminar los anuncios del producto ${id}: ${err.message}`);
-            }
-        } else {
-            console.warn("⚠️ ANUNCIO_SERVICE_URL no está configurada.");
-        }
-
-        // 🔗 Notificar al microservicio de carrito
-        if (process.env.CARRITO_SERVICE_URL) {
-            try {
-                const carritoResp = await axios.delete(
-                    `${process.env.CARRITO_SERVICE_URL}/api/carrito/eliminar-producto-global/${id}`,
-                    { 
-                        timeout: 5000,
-                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
-                    }
-                );
-                console.log(`🛒 Producto eliminado de ${carritoResp.data?.resultado?.modifiedCount || 0} carritos: ${carritoResp.data?.mensaje || 'OK'}`);
-            } catch (err) {
-                console.warn(`⚠️ No se pudo eliminar el producto ${id} de los carritos: ${err.message}`);
-            }
-        } else {
-            console.warn("⚠️ CARRITO_SERVICE_URL no está configurada.");
-        }
-
-        // 🔗 Notificar al microservicio de favoritos
-        if (process.env.FAVORITOS_SERVICE_URL) {
-            try {
-                const favResp = await axios.delete(
-                    `${process.env.FAVORITOS_SERVICE_URL}/api/favoritos/producto/${id}`,
-                    { 
-                        timeout: 5000,
-                        headers: { 'x-api-key': process.env.MICROSERVICIO_API_KEY }
-                    }
-                );
-                console.log(`⭐ Producto eliminado de favoritos: ${favResp.data?.mensaje || 'OK'}`);
-            } catch (err) {
-                console.warn(`⚠️ No se pudo eliminar el producto ${id} de favoritos: ${err.message}`);
-            }
-        } else {
-            console.warn("⚠️ FAVORITOS_SERVICE_URL no está configurada.");
-        }
-
-        // 🧹 Limpiar caché
-        await redisClient.del('productos_todos');
-        await redisClient.del('filtros_productos');
-
-        console.log(`✅ Producto ${id} eliminado completamente (incluyendo imágenes, anuncios, carritos, favoritos e historial).`);
-        res.json({ mensaje: '✅ Producto eliminado y quitado de anuncios, carritos, favoritos e historial.' });
-
-    } catch (error) {
-        console.error("❌ Error en eliminarProducto:", error);
-        res.status(500).json({ mensaje: '❌ Error al eliminar el producto.', error: error.message });
+  try {
+    if (!['admin', 'superAdmin'].includes(req.usuario.rol)) {
+      return res.status(403).json({ mensaje: '⛔ No tienes permisos para eliminar productos.' });
     }
+
+    const { id } = req.params;
+
+    // Buscar el producto
+    const producto = await Producto.findById(id);
+    if (!producto) {
+      return res.status(404).json({ mensaje: '🚫 Producto no encontrado.' });
+    }
+
+    // Eliminar imagen del producto en Cloudinary si existe
+    if (producto.public_id) {
+      try {
+        await cloudinary.uploader.destroy(producto.public_id);
+        console.log(`🧹 Imagen del producto eliminada: ${producto.public_id}`);
+      } catch (error) {
+        console.warn(`⚠️ No se pudo eliminar la imagen de Cloudinary: ${error.message}`);
+      }
+    }
+
+    // Eliminar el producto
+    await Producto.findByIdAndDelete(id);
+    console.log(`🗑️ Producto eliminado: ${producto.nombre}`);
+
+    // 🔥 Eliminar todas las reseñas asociadas al producto
+    const resultado = await Resena.deleteMany({ producto: id });
+    console.log(`🧹 ${resultado.deletedCount} reseñas eliminadas del producto ${producto.nombre}`);
+
+    // Limpiar cache
+    await redisClient.del('productos_todos');
+    await redisClient.del('filtros_productos');
+
+    res.json({ mensaje: '✅ Producto y sus reseñas fueron eliminados correctamente.' });
+  } catch (error) {
+    console.error("❌ Error al eliminar producto:", error);
+    res.status(500).json({ mensaje: '❌ No se pudo eliminar el producto.', error: error.message });
+  }
 };
 
 // 🔄 Cambiar estado del producto (corregido)
