@@ -36,7 +36,7 @@ const generarPlantillaCodigoReset = (nombre = "usuario", codigo) => {
             <tr>
               <td style="padding:20px 30px 30px; font-size:14px; color:#666;">
                 <p style="margin-bottom:10px;">¿Necesitas ayuda adicional?</p>
-                <p>Escríbenos a <a href="mailto:soporte@soportee.store" style="color:#BE0C0C; text-decoration:none;">soporte@soportee.store</a>. Estaremos encantados de ayudarte.</p>
+                <p>Escríbenos a <a href="mailto:soporteinsportswear@gmail.com" style="color:#BE0C0C; text-decoration:none;">soporteinsportswear@gmail.com</a>. Estaremos encantados de ayudarte.</p>
               </td>
             </tr>
             <tr>

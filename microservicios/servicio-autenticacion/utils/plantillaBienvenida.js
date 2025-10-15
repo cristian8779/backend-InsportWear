@@ -25,11 +25,6 @@ const generarPlantillaBienvenida = (nombre) => {
                     <tr>
                       <td align="center" style="padding: 40px 20px 20px; background-color: #ffffff;">
                         
-                        <!-- Logo deportivo con emoji -->
-                        <div style="background: linear-gradient(135deg, #b30000 0%, #d63031 100%); width: 80px; height: 80px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(179, 0, 0, 0.3);">
-                          <span style="font-size: 36px; color: white;">🏃</span>
-                        </div>
-                        
                         <!-- Nombre de la empresa -->
                         <h1 style="margin: 0 0 10px; font-size: 28px; font-weight: bold; color: #b30000; text-align: center; letter-spacing: 1px;">
                           InsportWear
@@ -142,7 +137,7 @@ const generarPlantillaBienvenida = (nombre) => {
                           </p>
                           <div style="background-color: white; padding: 12px; border-radius: 6px; display: inline-block;">
                             <p style="margin: 0; font-size: 13px; color: #b30000; font-weight: bold;">
-                              📧 soporte@insportwear.com | 📞 +57 300 123 4567
+                              📧 soporteinsportswear@gmail.com
                             </p>
                           </div>
                         </div>
